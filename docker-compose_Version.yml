@@ -1,0 +1,51 @@
+version: "3.9"
+services:
+
+  # YOUR landing page
+  landing-page:
+    build: ./landing-page
+    ports: ["3000:3000"]
+    environment:
+      - VITE_API_GATEWAY=http://localhost:8000
+
+  # YOUR microservice (MS-1)
+  audit-trail-service:
+    build: ./services/audit-trail-service
+    ports: ["8001:8001"]
+    environment:
+      - AI_PROVIDER=gemini          # FREE during dev!
+      - GEMINI_API_KEY=${GEMINI_KEY}
+      - DATABASE_URL=${DB_URL}
+      # In your .env file
+      # DO NOT USE: DATABASE_URL=postgresql://epharmic:password@localhost:5432/epharmic_db
+
+      # USE THIS:
+      #DATABASE_URL=postgresql://epharmic:password@postgres:5432/epharmic_db
+
+  # Other teams' services (pulled as Docker images)
+  stability-report-service:
+    image: enviroapps/stability-report:latest   # Team B pushes this
+    ports: ["8002:8002"]
+
+  oot-alerting-service:
+    image: enviroapps/oot-alerting:latest        # Team C pushes this
+    ports: ["8003:8003"]
+
+  data-entry-service:
+    image: enviroapps/data-entry:latest          # Team D pushes this
+    ports: ["8004:8004"]
+
+  # API Gateway
+  gateway:
+    image: nginx:alpine
+    ports: ["8000:8000"]
+    volumes:
+      - ./gateway/nginx.conf:/etc/nginx/nginx.conf
+
+  # Database
+  postgres:
+    image: postgres:15
+    ports: ["5432:5432"]
+    environment:
+      POSTGRES_DB: epharmic_db
+      POSTGRES_PASSWORD: ${DB_PASSWORD}

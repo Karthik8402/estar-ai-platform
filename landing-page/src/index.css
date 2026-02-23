@@ -1,0 +1,158 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import "tailwindcss";
+
+/* ── Color System ──────────────────────────────────────────── */
+:root {
+  --background: #ffffff;
+  --surface: #f8f9fb;
+  --surface-raised: #ffffff;
+  --border: #e4e7ec;
+  --border-strong: #cdd1da;
+
+  --text-primary: #0f1729;
+  --text-secondary: #4b5563;
+  --text-tertiary: #9ca3af;
+  --text-inverse: #ffffff;
+
+  --brand: #4f46e5;
+  --brand-hover: #4338ca;
+  --brand-subtle: #eef2ff;
+  --brand-muted: #c7d2fe;
+
+  --status-online: #059669;
+  --status-online-bg: #ecfdf5;
+  --status-warning: #d97706;
+  --status-warning-bg: #fffbeb;
+  --status-error: #dc2626;
+  --status-error-bg: #fef2f2;
+  --status-info: #2563eb;
+  --status-info-bg: #eff6ff;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.08);
+  --shadow-card-hover: 0 8px 24px rgba(0, 0, 0, 0.10);
+
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+}
+
+.dark {
+  --background: #09090b;
+  --surface: #111113;
+  --surface-raised: #18181b;
+  --border: #27272a;
+  --border-strong: #3f3f46;
+
+  --text-primary: #fafafa;
+  --text-secondary: #a1a1aa;
+  --text-tertiary: #52525b;
+
+  --brand-subtle: #1e1b4b;
+  --status-online-bg: #064e3b;
+  --status-warning-bg: #78350f;
+  --status-error-bg: #7f1d1d;
+  --status-info-bg: #1e3a5f;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.20);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.30);
+  --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.35);
+  --shadow-card-hover: 0 8px 24px rgba(0, 0, 0, 0.40);
+}
+
+/* ── Base ──────────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--background);
+  color: var(--text-primary);
+  line-height: 1.6;
+  min-height: 100vh;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+/* ── Audit Dashboard Layout ───────────────────────────────── */
+.audit-dashboard-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 120px);
+}
+
+/* Desktop sidebar */
+.audit-sidebar-desktop {
+  display: none;
+}
+
+/* Mobile tab bar — visible by default */
+.audit-tabbar-mobile {
+  display: flex;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--border);
+  background: var(--background);
+  padding: 0 8px;
+  gap: 4px;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* At md (768px+): show sidebar, hide tab bar */
+@media (min-width: 768px) {
+  .audit-dashboard-shell {
+    flex-direction: row;
+  }
+
+  .audit-sidebar-desktop {
+    display: flex;
+    flex-direction: column;
+    width: 200px;
+    flex-shrink: 0;
+    border-right: 1px solid var(--border);
+    background: var(--background);
+    padding: 24px 12px;
+    min-height: calc(100vh - 120px);
+  }
+
+  .audit-tabbar-mobile {
+    display: none;
+  }
+}
+
+/* Dashboard content */
+.audit-dashboard-content {
+  flex: 1;
+  padding: 20px 16px;
+  overflow: auto;
+  width: 100%;
+}
+
+@media (min-width: 768px) {
+  .audit-dashboard-content {
+    padding: 32px;
+    max-width: 1080px;
+    margin: 0 auto;
+  }
+}
+
+/* ── Anomaly table responsive ─────────────────────────────── */
+@media (max-width: 767px) {
+  .audit-dashboard-content table {
+    font-size: 13px;
+  }
+}

@@ -1,0 +1,67 @@
+{
+  "platform": "ePharmic AI Platform",
+  "company": "EnviroApps Inc",
+  "version": "1.0.0",
+  "services": [
+    {
+      "id": "audit-trail",
+      "name": "Agentic AI Audit Trail & Log Integrity",
+      "owner": "Karthik8402",
+      "description": "Multi-agent AI system monitoring audit trails and system logs for 21 CFR Part 11 compliance",
+      "icon": "🔍",
+      "color": "#6366f1",
+      "status_endpoint": "/api/audit/health",
+      "dashboard_path": "/audit",
+      "gateway_prefix": "/api/audit",
+      "port": 8001,
+      "repo": "Karthik8402/eStar_helpdesk",
+      "features": ["Human Error Detection", "Log Integrity", "Compliance Reports"],
+      "compliance": ["21 CFR Part 11"]
+    },
+    {
+      "id": "stability-report",
+      "name": "Automated Stability Report Generator",
+      "owner": "Team B",
+      "description": "Automatically generates stability reports from experimental data",
+      "icon": "📊",
+      "color": "#10b981",
+      "status_endpoint": "/api/stability/health",
+      "dashboard_path": "/stability",
+      "gateway_prefix": "/api/stability",
+      "port": 8002,
+      "repo": "enviroapps/stability-report-service",
+      "features": ["Auto Report Generation", "Data Aggregation", "PDF Export"],
+      "compliance": ["ICH Q1A", "21 CFR Part 211"]
+    },
+    {
+      "id": "oot-alerting",
+      "name": "Predictive Stability & OOT Alerting System",
+      "owner": "Team C",
+      "description": "Predicts out-of-trend stability results before they become failures",
+      "icon": "⚡",
+      "color": "#f59e0b",
+      "status_endpoint": "/api/oot/health",
+      "dashboard_path": "/oot",
+      "gateway_prefix": "/api/oot",
+      "port": 8003,
+      "repo": "enviroapps/oot-alerting-service",
+      "features": ["Predictive Alerts", "Trend Analysis", "Risk Scoring"],
+      "compliance": ["ICH Q1E", "21 CFR Part 211"]
+    },
+    {
+      "id": "data-entry",
+      "name": "Intelligent Data Entry & Validation Agent",
+      "owner": "Team D",
+      "description": "AI-powered data entry assistant with real-time validation",
+      "icon": "✅",
+      "color": "#3b82f6",
+      "status_endpoint": "/api/data-entry/health",
+      "dashboard_path": "/data-entry",
+      "gateway_prefix": "/api/data-entry",
+      "port": 8004,
+      "repo": "enviroapps/data-entry-service",
+      "features": ["Smart Validation", "Auto-correction", "Compliance Check"],
+      "compliance": ["21 CFR Part 11", "GMP"]
+    }
+  ]
+}

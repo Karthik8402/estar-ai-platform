@@ -1,0 +1,36 @@
+# MANDATORY endpoints every microservice MUST implement
+# This is the team agreement / contract
+
+required_endpoints:
+
+  # 1. Health Check — Landing page polls this every 30s
+  GET /health:
+    response:
+      status: "healthy" | "degraded" | "down"
+      service_name: string
+      version: string
+      uptime_seconds: number
+      last_activity: ISO8601 timestamp
+
+  # 2. Summary Stats — Landing page card shows these numbers
+  GET /summary:
+    headers:
+      Authorization: "Bearer <jwt_token>"
+    response:
+      total_processed: number       # e.g. "1,204 logs analyzed"
+      alerts_today: number          # e.g. "3 anomalies found"
+      last_run: ISO8601 timestamp
+      compliance_score: number      # 0-100
+      quick_stats: object           # custom per service
+
+  # 3. Recent Activity Feed — Landing page activity timeline
+  GET /activity/recent?limit=5:
+    headers:
+      Authorization: "Bearer <jwt_token>"
+    response:
+      items:
+        - id: string
+          timestamp: ISO8601
+          message: string           # plain English
+          severity: "info"|"warn"|"critical"
+          service: string
