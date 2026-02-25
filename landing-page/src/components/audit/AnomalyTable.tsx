@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { getAnomalies } from '../../config/simulatedAuditData';
+import { useAnomalies } from '../../hooks/audit/useAnomalies';
+import { getAnomalies as getSimulatedAnomalies } from '../../config/simulatedAuditData';
 import FilterBar from './FilterBar';
 import AnomalyRow from './AnomalyRow';
 
@@ -10,11 +11,14 @@ export default function AnomalyTable() {
   const [search, setSearch] = useState('');
   const limit = 10;
 
-  const { items, total, totalPages } = getAnomalies(page, limit, severity, type, search);
+  const { data } = useAnomalies(page, limit, severity, type, search);
+  const items = data?.items ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = data?.totalPages ?? 1;
 
   const handleExport = () => {
     const header = 'Event ID,Timestamp,Severity,Type,Message,User,Risk Score\n';
-    const allData = getAnomalies(1, 100, severity, type, search);
+    const allData = getSimulatedAnomalies(1, 100, severity, type, search);
     const csv = header + allData.items.map(a =>
       `${a.event_id},${a.timestamp},${a.severity},${a.anomaly_type},"${a.message}",${a.user},${a.risk_score}`
     ).join('\n');

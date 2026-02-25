@@ -1,29 +1,29 @@
 import { useState } from 'react';
-import { getAgents, type AgentStatus } from '../../config/simulatedAuditData';
+import { useAgentStatus, useStartAgent, useStopAgent, useStartAllAgents, useStopAllAgents } from '../../hooks/audit/useAgentStatus';
 import AgentCard from './AgentCard';
 
 export default function AgentControl() {
-  const [agents, setAgents] = useState<AgentStatus[]>(() => getAgents());
+  const { data: agents = [] } = useAgentStatus();
+  const startAgent = useStartAgent();
+  const stopAgent = useStopAgent();
+  const startAll = useStartAllAgents();
+  const stopAll = useStopAllAgents();
   const [showConfirm, setShowConfirm] = useState(false);
 
-  const updateAgent = (agentId: string, updates: Partial<AgentStatus>) => {
-    setAgents(prev => prev.map(a => a.agent_id === agentId ? { ...a, ...updates } : a));
-  };
-
   const handleStart = (agentId: string) => {
-    updateAgent(agentId, { status: 'running', last_run: new Date().toISOString(), error_message: null });
+    startAgent.mutate(agentId);
   };
 
   const handleStop = (agentId: string) => {
-    updateAgent(agentId, { status: 'stopped' });
+    stopAgent.mutate(agentId);
   };
 
   const handleStartAll = () => {
-    setAgents(prev => prev.map(a => ({ ...a, status: 'running' as const, last_run: new Date().toISOString(), error_message: null })));
+    startAll.mutate();
   };
 
   const handleStopAll = () => {
-    setAgents(prev => prev.map(a => a.status === 'running' ? { ...a, status: 'stopped' as const } : a));
+    stopAll.mutate();
     setShowConfirm(false);
   };
 

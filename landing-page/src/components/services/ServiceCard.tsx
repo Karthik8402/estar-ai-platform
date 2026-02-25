@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import CountUp from 'react-countup';
 import type { ServiceConfig } from '../../config/services';
-import { getSimulatedHealth, getSimulatedSummary, type ServiceStatus } from '../../config/simulatedData';
+import type { ServiceStatus } from '../../config/simulatedData';
+import { useServiceHealth } from '../../hooks/useServiceHealth';
+import { useServiceSummary } from '../../hooks/useServiceSummary';
 import ServiceStatusBadge from './ServiceStatusBadge';
 
 interface Props {
@@ -18,8 +20,8 @@ function mapStatus(s: ServiceStatus): 'online' | 'degraded' | 'offline' | 'loadi
 
 export default function ServiceCard({ service }: Props) {
   const navigate = useNavigate();
-  const health = getSimulatedHealth(service.id);
-  const summary = getSimulatedSummary(service.id);
+  const { data: health } = useServiceHealth(service.id, service.status_endpoint);
+  const { data: summary } = useServiceSummary(service.id, service.gateway_prefix);
   const status = mapStatus(health?.status ?? 'loading');
   const isDown = status === 'offline';
 

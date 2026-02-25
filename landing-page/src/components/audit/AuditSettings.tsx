@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { getThresholds, getComplianceRules, type AuditThresholds } from '../../config/simulatedAuditData';
+import { useState, useEffect } from 'react';
+import type { AuditThresholds } from '../../config/simulatedAuditData';
+import { useThresholds, useComplianceRules, useUpdateThresholds } from '../../hooks/audit/useAuditConfig';
 
 const THRESHOLD_META: Array<{ key: keyof AuditThresholds; label: string; suffix: string }> = [
   { key: 'failed_login_threshold', label: 'Failed login threshold', suffix: 'attempts' },
@@ -11,17 +12,21 @@ const THRESHOLD_META: Array<{ key: keyof AuditThresholds; label: string; suffix:
 ];
 
 export default function AuditSettings() {
-  const [thresholds, setThresholds] = useState<AuditThresholds>(() => getThresholds());
+  const { data: fetchedThresholds } = useThresholds();
+  const { data: rules = [] } = useComplianceRules();
+  const updateThresholdsMutation = useUpdateThresholds();
+  const [thresholds, setThresholds] = useState<AuditThresholds>({} as AuditThresholds);
   const [editMode, setEditMode] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const rules = getComplianceRules();
+  const saving = updateThresholdsMutation.isPending;
+
+  useEffect(() => {
+    if (fetchedThresholds) setThresholds(fetchedThresholds);
+  }, [fetchedThresholds]);
 
   const handleSave = () => {
-    setSaving(true);
-    setTimeout(() => {
-      setSaving(false);
-      setEditMode(false);
-    }, 800); // simulated save
+    updateThresholdsMutation.mutate(thresholds, {
+      onSuccess: () => setEditMode(false),
+    });
   };
 
   const handleChange = (key: keyof AuditThresholds, value: string) => {

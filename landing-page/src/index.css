@@ -126,7 +126,10 @@ body {
     border-right: 1px solid var(--border);
     background: var(--background);
     padding: 24px 12px;
-    min-height: calc(100vh - 120px);
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: hidden;
   }
 
   .audit-tabbar-mobile {
@@ -154,5 +157,12 @@ body {
 @media (max-width: 767px) {
   .audit-dashboard-content table {
     font-size: 13px;
+  }
+}
+
+/* ── Animations ───────────────────────────────────────────── */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
   }
 }

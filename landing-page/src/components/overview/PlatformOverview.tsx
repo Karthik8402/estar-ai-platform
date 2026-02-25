@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import CountUp from 'react-countup';
+// TODO: Replace with aggregated hook data once all 4 microservices have backends
 import { getAverageComplianceScore, getOnlineCount, getTotalServices, getDegradedCount } from '../../config/simulatedData';
 
 export default function PlatformOverview() {

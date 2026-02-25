@@ -86,6 +86,8 @@ export default function AuditSidebar({ activeSection, onNavigate }: Props) {
             cursor: 'pointer',
             textAlign: 'left',
           }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-primary)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-tertiary)'; }}
         >
           ← Back
         </button>

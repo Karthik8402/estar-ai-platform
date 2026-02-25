@@ -1,19 +1,25 @@
 import { useEffect, useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
-import { getIntegrity } from '../../config/simulatedAuditData';
+import { useIntegrity } from '../../hooks/audit/useIntegrity';
 
 export default function IntegrityView() {
-  const data = getIntegrity();
+  const { data } = useIntegrity();
   const [barWidth, setBarWidth] = useState(0);
 
-  useEffect(() => {
-    const timer = setTimeout(() => setBarWidth(data.integrity_score), 100);
-    return () => clearTimeout(timer);
-  }, [data.integrity_score]);
+  const integrity_score = data?.integrity_score ?? 0;
+  const entries_verified = data?.entries_verified ?? 0;
+  const violations = data?.violations ?? [];
+  const checks = data?.checks ?? [];
+  const last_check = data?.last_check ?? new Date().toISOString();
 
-  const barColor = data.integrity_score >= 90
+  useEffect(() => {
+    const timer = setTimeout(() => setBarWidth(integrity_score), 100);
+    return () => clearTimeout(timer);
+  }, [integrity_score]);
+
+  const barColor = integrity_score >= 90
     ? 'var(--status-online)'
-    : data.integrity_score >= 70
+    : integrity_score >= 70
       ? 'var(--status-warning)'
       : 'var(--status-error)';
 
@@ -24,7 +30,7 @@ export default function IntegrityView() {
         Log Integrity
       </h2>
       <p style={{ fontSize: '13px', color: 'var(--text-tertiary)', margin: '0 0 24px 0' }}>
-        Last check: {formatDistanceToNow(new Date(data.last_check), { addSuffix: true })}
+        Last check: {formatDistanceToNow(new Date(last_check), { addSuffix: true })}
       </p>
 
       {/* Score block */}
@@ -42,7 +48,7 @@ export default function IntegrityView() {
             Integrity Score
           </h3>
           <span className="font-mono" style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)' }}>
-            {data.integrity_score}%
+            {integrity_score}%
           </span>
         </div>
 
@@ -60,7 +66,7 @@ export default function IntegrityView() {
         </div>
 
         <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: 0 }}>
-          {data.entries_verified} entries verified · {data.violations.length} violations found
+          {entries_verified} entries verified · {violations.length} violations found
         </p>
       </div>
 
@@ -79,12 +85,12 @@ export default function IntegrityView() {
             Violations
           </h3>
         </div>
-        {data.violations.map((v, i) => (
+        {violations.map((v, i) => (
           <div
             key={i}
             style={{
               padding: '14px 20px',
-              borderBottom: i < data.violations.length - 1 ? '1px solid var(--border)' : 'none',
+              borderBottom: i < violations.length - 1 ? '1px solid var(--border)' : 'none',
             }}
           >
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
@@ -119,7 +125,7 @@ export default function IntegrityView() {
         <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 12px 0' }}>
           Checks Performed
         </h3>
-        {data.checks.map((check, i) => {
+        {checks.map((check, i) => {
           const resultColor = check.passed
             ? (check.detail.includes('warnings') ? 'var(--status-warning)' : 'var(--status-online)')
             : 'var(--status-error)';
@@ -130,11 +136,16 @@ export default function IntegrityView() {
                 display: 'flex',
                 justifyContent: 'space-between',
                 padding: '8px 0',
-                borderBottom: i < data.checks.length - 1 ? '1px solid var(--border)' : 'none',
+                borderBottom: i < checks.length - 1 ? '1px solid var(--border)' : 'none',
               }}
             >
               <span style={{ fontSize: '14px', color: 'var(--text-primary)' }}>
-                <span style={{ color: 'var(--status-online)', marginRight: '6px' }}>✓</span>
+                <span style={{
+                  color: check.passed ? 'var(--status-online)' : 'var(--status-error)',
+                  marginRight: '6px',
+                }}>
+                  {check.passed ? '✓' : '✗'}
+                </span>
                 {check.name}
               </span>
               <span style={{ fontSize: '14px', color: resultColor, textAlign: 'right' }}>

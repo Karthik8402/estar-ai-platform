@@ -1,8 +1,28 @@
 import { formatDistanceToNow } from 'date-fns';
-import { getSimulatedActivity, type ActivityItem } from '../../config/simulatedData';
+import { useActivityFeed } from '../../hooks/useActivityFeed';
+import type { ActivityItem } from '../../config/simulatedData';
 
 export default function GlobalActivityFeed() {
-  const activities = getSimulatedActivity();
+  const { data: activities = [], isLoading } = useActivityFeed(10);
+
+  if (isLoading) {
+    return (
+      <section style={{ marginTop: '48px' }}>
+        <h2 style={{ fontSize: '20px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '16px' }}>
+          Recent Activity
+        </h2>
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px' }}>
+          {[...Array(5)].map((_, i) => (
+            <div key={i} style={{ display: 'flex', gap: '12px', padding: '12px 0', borderBottom: i < 4 ? '1px solid var(--border)' : 'none' }}>
+              <div style={{ width: '100px', height: '16px', background: 'var(--border)', borderRadius: '4px', animation: 'pulse 2s infinite' }} />
+              <div style={{ flex: 1, height: '16px', background: 'var(--border)', borderRadius: '4px', animation: 'pulse 2s infinite' }} />
+              <div style={{ width: '60px', height: '16px', background: 'var(--border)', borderRadius: '4px', animation: 'pulse 2s infinite' }} />
+            </div>
+          ))}
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section style={{ marginTop: '48px' }}>

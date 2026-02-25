@@ -1,9 +1,24 @@
 import { formatDistanceToNow } from 'date-fns';
 import MetricCard from '../shared/MetricCard';
-import { getAuditActivity } from '../../config/simulatedAuditData';
+import { useActivityFeed } from '../../hooks/useActivityFeed';
+import { useServiceSummary } from '../../hooks/useServiceSummary';
 
 export default function AuditOverview() {
-  const activity = getAuditActivity();
+  const { data: activity = [] } = useActivityFeed(5);
+  const { data: summary } = useServiceSummary('audit-trail', '/api/audit');
+
+  // Compute dynamic last run display from summary
+  const lastRunStr = summary?.last_run
+    ? formatDistanceToNow(new Date(summary.last_run), { addSuffix: true })
+    : 'loading...';
+
+  // Dynamic quick stats from the backend /summary endpoint
+  const quickStats = [
+    { key: 'Logs analyzed', value: String(summary?.quick_stats?.logs_analyzed_today ?? '—') },
+    { key: 'Anomalies flagged', value: String(summary?.quick_stats?.anomalies_flagged ?? '—') },
+    { key: 'Integrity checks passed', value: String(summary?.quick_stats?.integrity_checks_passed ?? '—') },
+    { key: 'Human errors detected', value: String(summary?.quick_stats?.human_errors_detected ?? '—') },
+  ];
 
   return (
     <div>
@@ -23,21 +38,19 @@ export default function AuditOverview() {
           <span>·</span>
           <span>v1.0.0</span>
           <span>·</span>
-          <span>Uptime 4h 23m</span>
-          <span>·</span>
-          <span>Last run 2m ago</span>
+          <span>Last run {lastRunStr}</span>
         </div>
       </div>
 
-      {/* Metric cards */}
+      {/* Metric cards — values from /summary API */}
       <div className="grid grid-cols-2 md:grid-cols-4" style={{ gap: '16px', marginBottom: '24px' }}>
-        <MetricCard value={1204} label="LOGS ANALYZED" />
-        <MetricCard value={3} label="ALERTS TODAY" accent="warning" />
-        <MetricCard value={94} label="COMPLIANCE SCORE" suffix="%" />
-        <MetricCard value={887} label="INTEGRITY PASSED" />
+        <MetricCard value={summary?.total_processed ?? 0} label="LOGS ANALYZED" />
+        <MetricCard value={summary?.alerts_today ?? 0} label="ALERTS TODAY" accent="warning" />
+        <MetricCard value={summary?.compliance_score ?? 0} label="COMPLIANCE SCORE" suffix="%" />
+        <MetricCard value={summary?.quick_stats?.integrity_checks_passed ?? 0} label="INTEGRITY PASSED" />
       </div>
 
-      {/* Quick stats */}
+      {/* Quick stats — dynamic from /summary API */}
       <div
         style={{
           background: 'var(--surface)',
@@ -50,12 +63,7 @@ export default function AuditOverview() {
         <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 12px 0' }}>
           Quick Stats
         </h3>
-        {[
-          { key: 'Logs analyzed today', value: '890' },
-          { key: 'Anomalies flagged', value: '3' },
-          { key: 'Integrity checks', value: '887' },
-          { key: 'Human errors detected', value: '2' },
-        ].map((row, i, arr) => (
+        {quickStats.map((row, i, arr) => (
           <div
             key={row.key}
             style={{

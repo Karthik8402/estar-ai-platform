@@ -1,51 +1,98 @@
 version: "3.9"
+
 services:
 
-  # YOUR landing page
-  landing-page:
-    build: ./landing-page
-    ports: ["3000:3000"]
-    environment:
-      - VITE_API_GATEWAY=http://localhost:8000
-
-  # YOUR microservice (MS-1)
-  audit-trail-service:
-    build: ./services/audit-trail-service
-    ports: ["8001:8001"]
-    environment:
-      - AI_PROVIDER=gemini          # FREE during dev!
-      - GEMINI_API_KEY=${GEMINI_KEY}
-      - DATABASE_URL=${DB_URL}
-      # In your .env file
-      # DO NOT USE: DATABASE_URL=postgresql://epharmic:password@localhost:5432/epharmic_db
-
-      # USE THIS:
-      #DATABASE_URL=postgresql://epharmic:password@postgres:5432/epharmic_db
-
-  # Other teams' services (pulled as Docker images)
-  stability-report-service:
-    image: enviroapps/stability-report:latest   # Team B pushes this
-    ports: ["8002:8002"]
-
-  oot-alerting-service:
-    image: enviroapps/oot-alerting:latest        # Team C pushes this
-    ports: ["8003:8003"]
-
-  data-entry-service:
-    image: enviroapps/data-entry:latest          # Team D pushes this
-    ports: ["8004:8004"]
-
-  # API Gateway
-  gateway:
-    image: nginx:alpine
-    ports: ["8000:8000"]
-    volumes:
-      - ./gateway/nginx.conf:/etc/nginx/nginx.conf
-
-  # Database
+  # ═══════════════════════════════════════════════════════════
+  # DATABASE — PostgreSQL 15
+  # ═══════════════════════════════════════════════════════════
   postgres:
-    image: postgres:15
-    ports: ["5432:5432"]
+    image: postgres:15-alpine
+    container_name: epharmic-postgres
+    restart: unless-stopped
+    ports: [ "5432:5432" ]
     environment:
       POSTGRES_DB: epharmic_db
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_USER: epharmic
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-password}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U epharmic -d epharmic_db" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ═══════════════════════════════════════════════════════════
+  # LANDING PAGE — React + Vite
+  # ═══════════════════════════════════════════════════════════
+  landing-page:
+    build: ./landing-page
+    container_name: epharmic-landing
+    restart: unless-stopped
+    ports: [ "3000:3000" ]
+    environment:
+      - VITE_API_GATEWAY_URL=http://gateway:8000
+    depends_on:
+      - gateway
+
+  # ═══════════════════════════════════════════════════════════
+  # MS-1 — Audit Trail Service (YOUR microservice)
+  # ═══════════════════════════════════════════════════════════
+  audit-trail-service:
+    build: ./services/audit-trail-service
+    container_name: epharmic-audit
+    restart: unless-stopped
+    ports: [ "8001:8001" ]
+    environment:
+      - DATABASE_URL=postgresql://epharmic:${DB_PASSWORD:-password}@postgres:5432/epharmic_db
+      - AI_PROVIDER=gemini
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - SERVICE_PORT=8001
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # Run Alembic migrations on startup, then launch the app
+    command: >
+      sh -c "
+        python -m alembic upgrade head &&
+        python -m db.seed &&
+        uvicorn api.main:app --host 0.0.0.0 --port 8001
+      "
+
+  # ═══════════════════════════════════════════════════════════
+  # Other teams' services (pulled as Docker images)
+  # ═══════════════════════════════════════════════════════════
+  stability-report-service:
+    image: enviroapps/stability-report:latest
+    container_name: epharmic-stability
+    ports: [ "8002:8002" ]
+
+  oot-alerting-service:
+    image: enviroapps/oot-alerting:latest
+    container_name: epharmic-oot
+    ports: [ "8003:8003" ]
+
+  data-entry-service:
+    image: enviroapps/data-entry:latest
+    container_name: epharmic-data-entry
+    ports: [ "8004:8004" ]
+
+  # ═══════════════════════════════════════════════════════════
+  # API Gateway — NGINX reverse proxy
+  # ═══════════════════════════════════════════════════════════
+  gateway:
+    image: nginx:alpine
+    container_name: epharmic-gateway
+    restart: unless-stopped
+    ports: [ "8000:8000" ]
+    volumes:
+      - ./gateway/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - audit-trail-service
+
+# ═══════════════════════════════════════════════════════════
+# PERSISTENT VOLUMES
+# ═══════════════════════════════════════════════════════════
+volumes:
+  pgdata:
+    driver: local

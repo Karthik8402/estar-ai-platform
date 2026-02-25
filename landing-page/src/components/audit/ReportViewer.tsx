@@ -1,17 +1,23 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
-import { getReports } from '../../config/simulatedAuditData';
+import { useReports, useGenerateReport } from '../../hooks/audit/useReports';
 
 export default function ReportViewer() {
-  const reports = getReports();
+  const { data: reports = [] } = useReports();
+  const generateMutation = useGenerateReport();
   const [selectedId, setSelectedId] = useState<string>(reports[0]?.report_id ?? '');
-  const [generating, setGenerating] = useState(false);
 
-  const selected = reports.find(r => r.report_id === selectedId);
+  const selected = reports.find(r => r.report_id === selectedId) ?? reports[0];
+  const generating = generateMutation.isPending;
 
   const handleGenerate = () => {
-    setGenerating(true);
-    setTimeout(() => setGenerating(false), 2000); // simulated
+    generateMutation.mutate(undefined, {
+      onSuccess: (newReport) => {
+        if (newReport && newReport.report_id) {
+          setSelectedId(newReport.report_id);
+        }
+      }
+    });
   };
 
   const scoreColor = (score: number) =>

@@ -1,11 +1,22 @@
 import { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster, toast } from 'sonner';
 import LandingPage from './pages/LandingPage';
 import AuditDashboard from './pages/AuditDashboard';
 import PlatformHeader from './components/layout/PlatformHeader';
 import PlatformFooter from './components/layout/PlatformFooter';
 import { initServiceRegistry, type ServiceConfig } from './config/services';
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+      staleTime: 20_000,
+    },
+  },
+});
 
 export default function App() {
   const [services, setServices] = useState<ServiceConfig[]>([]);
@@ -60,7 +71,8 @@ export default function App() {
   }
 
   return (
-    <BrowserRouter>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
       <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
         <PlatformHeader companyName={platformInfo.company} platformName={platformInfo.platform} />
 
@@ -103,5 +115,6 @@ export default function App() {
         }}
       />
     </BrowserRouter>
+    </QueryClientProvider>
   );
 }
