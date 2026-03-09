@@ -106,6 +106,7 @@ export default function PlatformHeader({ companyName, platformName }: Props) {
               justifyContent: 'center',
               fontSize: '12px',
               fontWeight: 600,
+              overflow: 'hidden',
             }}
           >
             K

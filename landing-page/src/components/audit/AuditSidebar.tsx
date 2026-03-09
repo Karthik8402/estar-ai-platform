@@ -23,6 +23,26 @@ export default function AuditSidebar({ activeSection, onNavigate }: Props) {
     <>
       {/* Desktop sidebar — visible at md+ */}
       <aside className="audit-sidebar-desktop">
+        {/* ← Back at top — always visible */}
+        <button
+          onClick={() => navigate('/')}
+          style={{
+            marginBottom: '16px',
+            padding: '6px 12px',
+            border: 'none',
+            background: 'transparent',
+            color: 'var(--text-tertiary)',
+            fontSize: '13px',
+            fontFamily: 'inherit',
+            cursor: 'pointer',
+            textAlign: 'left',
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-primary)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-tertiary)'; }}
+        >
+          ← Back
+        </button>
+
         <div
           style={{
             fontSize: '11px',
@@ -37,7 +57,7 @@ export default function AuditSidebar({ activeSection, onNavigate }: Props) {
           Audit Trail
         </div>
 
-        <nav style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1 }}>
+        <nav style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
           {NAV_ITEMS.map((item) => {
             const isActive = activeSection === item.id;
             return (
@@ -72,25 +92,6 @@ export default function AuditSidebar({ activeSection, onNavigate }: Props) {
             );
           })}
         </nav>
-
-        <button
-          onClick={() => navigate('/')}
-          style={{
-            marginTop: 'auto',
-            padding: '8px 12px',
-            border: 'none',
-            background: 'transparent',
-            color: 'var(--text-tertiary)',
-            fontSize: '13px',
-            fontFamily: 'inherit',
-            cursor: 'pointer',
-            textAlign: 'left',
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-primary)'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-tertiary)'; }}
-        >
-          ← Back
-        </button>
       </aside>
 
       {/* Mobile tab bar — visible below md */}
