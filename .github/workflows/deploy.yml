@@ -113,6 +113,10 @@ jobs:
     environment: production
 
     steps:
+      - name: Get short SHA
+        id: sha
+        run: echo "short=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
+
       - name: Log in to Azure
         uses: azure/login@v1
         with:
@@ -123,14 +127,14 @@ jobs:
         with:
           resourceGroup: ${{ env.RESOURCE_GROUP }}
           containerAppName: audit-trail-service
-          imageToDeploy: ${{ env.REGISTRY }}/${{ env.GITHUB_USERNAME }}/audit-trail-service:sha-${{ github.sha }}
+          imageToDeploy: ${{ env.REGISTRY }}/${{ env.GITHUB_USERNAME }}/audit-trail-service:sha-${{ steps.sha.outputs.short }}
 
       - name: Deploy landing-page
         uses: azure/container-apps-deploy-action@v1
         with:
           resourceGroup: ${{ env.RESOURCE_GROUP }}
           containerAppName: landing-page
-          imageToDeploy: ${{ env.REGISTRY }}/${{ env.GITHUB_USERNAME }}/landing-page:sha-${{ github.sha }}
+          imageToDeploy: ${{ env.REGISTRY }}/${{ env.GITHUB_USERNAME }}/landing-page:sha-${{ steps.sha.outputs.short }}
 
       - name: ✅ Deployment complete
         run: |
