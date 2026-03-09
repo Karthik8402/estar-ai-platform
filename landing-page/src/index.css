@@ -93,7 +93,9 @@ body {
 .audit-dashboard-shell {
   display: flex;
   flex-direction: column;
-  min-height: calc(100vh - 120px);
+  height: calc(100vh - 56px);
+  /* 56px is the header height */
+  overflow: hidden;
 }
 
 /* Desktop sidebar */
@@ -126,10 +128,8 @@ body {
     border-right: 1px solid var(--border);
     background: var(--background);
     padding: 24px 12px;
-    position: sticky;
-    top: 0;
-    height: 100vh;
-    overflow-y: hidden;
+    height: 100%;
+    overflow-y: auto;
   }
 
   .audit-tabbar-mobile {
@@ -141,8 +141,8 @@ body {
 .audit-dashboard-content {
   flex: 1;
   padding: 20px 16px;
-  overflow: auto;
-  width: 100%;
+  overflow-y: auto;
+  height: 100%;
 }
 
 @media (min-width: 768px) {
