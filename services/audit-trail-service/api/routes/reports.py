@@ -1,5 +1,6 @@
 """Report endpoints — list, view, and generate (with Gemini AI)."""
 
+import logging
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -9,25 +10,30 @@ from db.database import get_db
 from db.models import AuditReport, AuditAnomaly, IntegrityCheck, IntegrityViolation
 
 router = APIRouter()
+logger = logging.getLogger("audit-trail-service")
 
 
 @router.get("/reports/summary")
 def get_reports(db: Session = Depends(get_db)):
     """Returns list of all generated reports for the ReportViewer table."""
+    try:
+        reports = db.query(AuditReport).order_by(AuditReport.generated_at.desc()).all()
 
-    reports = db.query(AuditReport).order_by(AuditReport.generated_at.desc()).all()
+        return [
+            {
+                "report_id": r.report_id,
+                "report_type": r.report_type,
+                "generated_at": r.generated_at.isoformat() + "Z" if r.generated_at else None,
+                "compliance_score": r.compliance_score,
+                "anomaly_count": r.anomaly_count,
+                "summary_text": r.summary_text,
+            }
+            for r in reports
+        ]
 
-    return [
-        {
-            "report_id": r.report_id,
-            "report_type": r.report_type,
-            "generated_at": r.generated_at.isoformat() + "Z" if r.generated_at else None,
-            "compliance_score": r.compliance_score,
-            "anomaly_count": r.anomaly_count,
-            "summary_text": r.summary_text,
-        }
-        for r in reports
-    ]
+    except Exception as e:
+        logger.error(f"[/reports/summary] Database query failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to fetch reports: {str(e)}")
 
 
 @router.post("/reports/generate")
@@ -204,29 +210,35 @@ FORMATTING RULES:
         )
 
     # Count existing reports for ID generation
-    report_count = db.query(func.count(AuditReport.id)).scalar() or 0
-    new_id = f"rpt_{str(report_count + 1).zfill(3)}"
+    try:
+        report_count = db.query(func.count(AuditReport.id)).scalar() or 0
+        new_id = f"rpt_{str(report_count + 1).zfill(3)}"
 
-    report = AuditReport(
-        report_id=new_id,
-        report_type=report_type,
-        generated_at=datetime.now(timezone.utc),
-        compliance_score=compliance_score,
-        anomaly_count=total_anomalies,
-        summary_text=summary_text,
-    )
-    db.add(report)
-    db.commit()
-    db.refresh(report)
+        report = AuditReport(
+            report_id=new_id,
+            report_type=report_type,
+            generated_at=datetime.now(timezone.utc),
+            compliance_score=compliance_score,
+            anomaly_count=total_anomalies,
+            summary_text=summary_text,
+        )
+        db.add(report)
+        db.commit()
+        db.refresh(report)
 
-    return {
-        "report_id": report.report_id,
-        "report_type": report.report_type,
-        "generated_at": report.generated_at.isoformat() + "Z",
-        "compliance_score": report.compliance_score,
-        "anomaly_count": report.anomaly_count,
-        "summary_text": report.summary_text,
-    }
+        return {
+            "report_id": report.report_id,
+            "report_type": report.report_type,
+            "generated_at": report.generated_at.isoformat() + "Z",
+            "compliance_score": report.compliance_score,
+            "anomaly_count": report.anomaly_count,
+            "summary_text": report.summary_text,
+        }
+
+    except Exception as e:
+        db.rollback()
+        logger.error(f"[/reports/generate] Failed to save report: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to save generated report: {str(e)}")
 
 
 def _generate_fallback_report(

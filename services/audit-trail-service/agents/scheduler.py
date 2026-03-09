@@ -143,8 +143,17 @@ async def run_log_analyzer():
 
         db.commit()
     except Exception as e:
-        logger.error(f"[AGENT 1] Error: {e}")
-        db.rollback()
+        logger.error(f"[AGENT 1] Error: {e}", exc_info=True)
+        try:
+            db.rollback()
+            agent = db.query(AgentConfig).filter(AgentConfig.agent_id == "agent_1").first()
+            if agent:
+                agent.status = "error"
+                agent.error_message = str(e)[:500]
+                agent.last_run = datetime.now(timezone.utc)
+                db.commit()
+        except Exception:
+            db.rollback()
     finally:
         db.close()
 
@@ -288,8 +297,17 @@ async def run_integrity_monitor():
 
         db.commit()
     except Exception as e:
-        logger.error(f"[AGENT 2] Error: {e}")
-        db.rollback()
+        logger.error(f"[AGENT 2] Error: {e}", exc_info=True)
+        try:
+            db.rollback()
+            agent = db.query(AgentConfig).filter(AgentConfig.agent_id == "agent_2").first()
+            if agent:
+                agent.status = "error"
+                agent.error_message = str(e)[:500]
+                agent.last_run = datetime.now(timezone.utc)
+                db.commit()
+        except Exception:
+            db.rollback()
     finally:
         db.close()
 
@@ -380,8 +398,17 @@ async def run_compliance_reporter():
 
         db.commit()
     except Exception as e:
-        logger.error(f"[AGENT 3] Error: {e}")
-        db.rollback()
+        logger.error(f"[AGENT 3] Error: {e}", exc_info=True)
+        try:
+            db.rollback()
+            agent = db.query(AgentConfig).filter(AgentConfig.agent_id == "agent_3").first()
+            if agent:
+                agent.status = "error"
+                agent.error_message = str(e)[:500]
+                agent.last_run = datetime.now(timezone.utc)
+                db.commit()
+        except Exception:
+            db.rollback()
     finally:
         db.close()
 

@@ -3,6 +3,8 @@ import { useAnomalies } from '../../hooks/audit/useAnomalies';
 import { getAnomalies as getSimulatedAnomalies } from '../../config/simulatedAuditData';
 import FilterBar from './FilterBar';
 import AnomalyRow from './AnomalyRow';
+import SectionLoader from '../shared/SectionLoader';
+import SectionError from '../shared/SectionError';
 
 export default function AnomalyTable() {
   const [page, setPage] = useState(1);
@@ -11,7 +13,7 @@ export default function AnomalyTable() {
   const [search, setSearch] = useState('');
   const limit = 10;
 
-  const { data } = useAnomalies(page, limit, severity, type, search);
+  const { data, isLoading, isError, refetch } = useAnomalies(page, limit, severity, type, search);
   const items = data?.items ?? [];
   const total = data?.total ?? 0;
   const totalPages = data?.totalPages ?? 1;
@@ -40,7 +42,7 @@ export default function AnomalyTable() {
         <div>
           <h2 style={{ fontSize: '20px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>Anomalies</h2>
           <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '4px 0 0 0' }}>
-            {items.length > 0 ? `${total} flagged` : 'No anomalies match your filters'}
+            {isLoading ? 'Loading…' : items.length > 0 ? `${total} flagged` : 'No anomalies match your filters'}
           </p>
         </div>
       </div>
@@ -55,89 +57,104 @@ export default function AnomalyTable() {
         onExport={handleExport}
       />
 
-      {/* Table */}
-      <div
-        style={{
-          background: 'var(--surface)',
-          border: '1px solid var(--border)',
-          borderRadius: '12px',
-          overflow: 'hidden',
-        }}
-      >
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '600px' }}>
-            <thead>
-              <tr style={{ borderBottom: '2px solid var(--border)' }}>
-                {['Severity', 'Type', 'Message', 'Time'].map((h) => (
-                  <th
-                    key={h}
-                    style={{
-                      padding: '10px 16px',
-                      textAlign: 'left',
-                      fontSize: '11px',
-                      fontWeight: 600,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.06em',
-                      color: 'var(--text-tertiary)',
-                      background: 'var(--surface)',
-                    }}
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((anomaly) => (
-                <AnomalyRow key={anomaly.event_id} anomaly={anomaly} />
-              ))}
-              {items.length === 0 && (
-                <tr>
-                  <td colSpan={4} style={{ padding: '40px 16px', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: '14px' }}>
-                    No anomalies found
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      {/* Loading state */}
+      {isLoading && <SectionLoader lines={5} label="Loading anomalies…" />}
 
-      {/* Pagination */}
-      {total > 0 && (
-        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '12px', marginTop: '12px' }}>
-          <span style={{ fontSize: '13px', color: 'var(--text-tertiary)' }}>
-            Showing {start}–{end} of {total}
-          </span>
-          <button
-            disabled={page <= 1}
-            onClick={() => setPage(page - 1)}
+      {/* Error state */}
+      {isError && !isLoading && (
+        <SectionError
+          message="Could not load anomaly data. The backend may be unreachable."
+          onRetry={() => refetch()}
+        />
+      )}
+
+      {/* Table — only render when not loading and no error */}
+      {!isLoading && !isError && (
+        <>
+          <div
             style={{
-              border: 'none',
-              background: 'transparent',
-              color: page <= 1 ? 'var(--text-tertiary)' : 'var(--brand)',
-              cursor: page <= 1 ? 'not-allowed' : 'pointer',
-              fontSize: '13px',
-              fontFamily: 'inherit',
+              background: 'var(--surface)',
+              border: '1px solid var(--border)',
+              borderRadius: '12px',
+              overflow: 'hidden',
             }}
           >
-            ← Prev
-          </button>
-          <button
-            disabled={page >= totalPages}
-            onClick={() => setPage(page + 1)}
-            style={{
-              border: 'none',
-              background: 'transparent',
-              color: page >= totalPages ? 'var(--text-tertiary)' : 'var(--brand)',
-              cursor: page >= totalPages ? 'not-allowed' : 'pointer',
-              fontSize: '13px',
-              fontFamily: 'inherit',
-            }}
-          >
-            Next →
-          </button>
-        </div>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '600px' }}>
+                <thead>
+                  <tr style={{ borderBottom: '2px solid var(--border)' }}>
+                    {['Severity', 'Type', 'Message', 'Time'].map((h) => (
+                      <th
+                        key={h}
+                        style={{
+                          padding: '10px 16px',
+                          textAlign: 'left',
+                          fontSize: '11px',
+                          fontWeight: 600,
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.06em',
+                          color: 'var(--text-tertiary)',
+                          background: 'var(--surface)',
+                        }}
+                      >
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((anomaly) => (
+                    <AnomalyRow key={anomaly.event_id} anomaly={anomaly} />
+                  ))}
+                  {items.length === 0 && (
+                    <tr>
+                      <td colSpan={4} style={{ padding: '40px 16px', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: '14px' }}>
+                        No anomalies found
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Pagination */}
+          {total > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '12px', marginTop: '12px' }}>
+              <span style={{ fontSize: '13px', color: 'var(--text-tertiary)' }}>
+                Showing {start}–{end} of {total}
+              </span>
+              <button
+                disabled={page <= 1}
+                onClick={() => setPage(page - 1)}
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  color: page <= 1 ? 'var(--text-tertiary)' : 'var(--brand)',
+                  cursor: page <= 1 ? 'not-allowed' : 'pointer',
+                  fontSize: '13px',
+                  fontFamily: 'inherit',
+                }}
+              >
+                ← Prev
+              </button>
+              <button
+                disabled={page >= totalPages}
+                onClick={() => setPage(page + 1)}
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  color: page >= totalPages ? 'var(--text-tertiary)' : 'var(--brand)',
+                  cursor: page >= totalPages ? 'not-allowed' : 'pointer',
+                  fontSize: '13px',
+                  fontFamily: 'inherit',
+                }}
+              >
+                Next →
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

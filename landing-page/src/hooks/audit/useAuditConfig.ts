@@ -8,6 +8,7 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { apiGet, apiPut } from '../../config/apiClient';
 import {
     getThresholds as getSimulatedThresholds,
@@ -55,6 +56,12 @@ export function useUpdateThresholds() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['audit', 'thresholds'] });
+            toast.success('Thresholds saved successfully');
+        },
+        onError: (error: unknown) => {
+            const msg = error instanceof Error ? error.message
+                : (error as { detail?: string })?.detail ?? 'Unknown error';
+            toast.error('Failed to save thresholds', { description: msg });
         },
     });
 }

@@ -8,6 +8,7 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { apiGet, apiPost } from '../../config/apiClient';
 import { getAgents as getSimulatedAgents, type AgentStatus } from '../../config/simulatedAuditData';
 
@@ -36,6 +37,12 @@ export function useStartAgent() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['audit', 'agents'] });
+            toast.success('Agent started successfully');
+        },
+        onError: (error: unknown) => {
+            const msg = error instanceof Error ? error.message
+                : (error as { detail?: string })?.detail ?? 'Unknown error';
+            toast.error('Failed to start agent', { description: msg });
         },
     });
 }
@@ -49,6 +56,12 @@ export function useStopAgent() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['audit', 'agents'] });
+            toast.success('Agent stopped');
+        },
+        onError: (error: unknown) => {
+            const msg = error instanceof Error ? error.message
+                : (error as { detail?: string })?.detail ?? 'Unknown error';
+            toast.error('Failed to stop agent', { description: msg });
         },
     });
 }
@@ -62,6 +75,12 @@ export function useStartAllAgents() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['audit', 'agents'] });
+            toast.success('All agents started');
+        },
+        onError: (error: unknown) => {
+            const msg = error instanceof Error ? error.message
+                : (error as { detail?: string })?.detail ?? 'Unknown error';
+            toast.error('Failed to start all agents', { description: msg });
         },
     });
 }
@@ -75,6 +94,12 @@ export function useStopAllAgents() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['audit', 'agents'] });
+            toast.success('All agents stopped');
+        },
+        onError: (error: unknown) => {
+            const msg = error instanceof Error ? error.message
+                : (error as { detail?: string })?.detail ?? 'Unknown error';
+            toast.error('Failed to stop all agents', { description: msg });
         },
     });
 }

@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { useIntegrity } from '../../hooks/audit/useIntegrity';
+import SectionLoader from '../shared/SectionLoader';
+import SectionError from '../shared/SectionError';
 
 export default function IntegrityView() {
-  const { data } = useIntegrity();
+  const { data, isLoading, isError, refetch } = useIntegrity();
   const [barWidth, setBarWidth] = useState(0);
 
   const integrity_score = data?.integrity_score ?? 0;
@@ -22,6 +24,31 @@ export default function IntegrityView() {
     : integrity_score >= 70
       ? 'var(--status-warning)'
       : 'var(--status-error)';
+
+  if (isLoading) {
+    return (
+      <div>
+        <h2 style={{ fontSize: '20px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 4px 0' }}>
+          Log Integrity
+        </h2>
+        <SectionLoader lines={6} label="Loading integrity data…" />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div>
+        <h2 style={{ fontSize: '20px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 16px 0' }}>
+          Log Integrity
+        </h2>
+        <SectionError
+          message="Could not load integrity check results."
+          onRetry={() => refetch()}
+        />
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -85,6 +112,11 @@ export default function IntegrityView() {
             Violations
           </h3>
         </div>
+        {violations.length === 0 && (
+          <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: '14px' }}>
+            No violations detected
+          </div>
+        )}
         {violations.map((v, i) => (
           <div
             key={i}
@@ -125,6 +157,11 @@ export default function IntegrityView() {
         <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 12px 0' }}>
           Checks Performed
         </h3>
+        {checks.length === 0 && (
+          <div style={{ textAlign: 'center', color: 'var(--text-tertiary)', fontSize: '14px', padding: '12px 0' }}>
+            No checks recorded
+          </div>
+        )}
         {checks.map((check, i) => {
           const resultColor = check.passed
             ? (check.detail.includes('warnings') ? 'var(--status-warning)' : 'var(--status-online)')

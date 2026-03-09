@@ -7,6 +7,7 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { apiGet, apiPost } from '../../config/apiClient';
 import { getReports as getSimulatedReports, type AuditReport } from '../../config/simulatedAuditData';
 
@@ -34,6 +35,12 @@ export function useGenerateReport() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['audit', 'reports'] });
+            toast.success('Report generated successfully');
+        },
+        onError: (error: unknown) => {
+            const msg = error instanceof Error ? error.message
+                : (error as { detail?: string })?.detail ?? 'Unknown error';
+            toast.error('Failed to generate report', { description: msg });
         },
     });
 }

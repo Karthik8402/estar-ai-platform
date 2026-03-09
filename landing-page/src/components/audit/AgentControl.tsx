@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { useAgentStatus, useStartAgent, useStopAgent, useStartAllAgents, useStopAllAgents } from '../../hooks/audit/useAgentStatus';
 import AgentCard from './AgentCard';
+import SectionLoader from '../shared/SectionLoader';
+import SectionError from '../shared/SectionError';
 
 export default function AgentControl() {
-  const { data: agents = [] } = useAgentStatus();
+  const { data: agents = [], isLoading, isError, refetch } = useAgentStatus();
   const startAgent = useStartAgent();
   const stopAgent = useStopAgent();
   const startAll = useStartAllAgents();
@@ -27,6 +29,9 @@ export default function AgentControl() {
     setShowConfirm(false);
   };
 
+  // Determine if any mutation is in-flight
+  const anyMutating = startAgent.isPending || stopAgent.isPending || startAll.isPending || stopAll.isPending;
+
   return (
     <div>
       {/* Header with bulk controls */}
@@ -35,6 +40,7 @@ export default function AgentControl() {
         <div style={{ display: 'flex', gap: '8px' }}>
           <button
             onClick={handleStartAll}
+            disabled={anyMutating}
             style={{
               background: 'var(--status-online)',
               color: 'var(--text-inverse)',
@@ -44,13 +50,15 @@ export default function AgentControl() {
               fontSize: '13px',
               fontWeight: 500,
               fontFamily: 'inherit',
-              cursor: 'pointer',
+              cursor: anyMutating ? 'not-allowed' : 'pointer',
+              opacity: anyMutating ? 0.6 : 1,
             }}
           >
             Start All
           </button>
           <button
             onClick={() => setShowConfirm(true)}
+            disabled={anyMutating}
             style={{
               background: 'transparent',
               color: 'var(--status-error)',
@@ -60,7 +68,8 @@ export default function AgentControl() {
               fontSize: '13px',
               fontWeight: 500,
               fontFamily: 'inherit',
-              cursor: 'pointer',
+              cursor: anyMutating ? 'not-allowed' : 'pointer',
+              opacity: anyMutating ? 0.6 : 1,
             }}
           >
             Stop All
@@ -136,8 +145,24 @@ export default function AgentControl() {
         </div>
       )}
 
+      {/* Loading state */}
+      {isLoading && <SectionLoader lines={3} label="Loading agent status…" />}
+
+      {/* Error state */}
+      {isError && !isLoading && (
+        <SectionError
+          message="Could not load agent status data."
+          onRetry={() => refetch()}
+        />
+      )}
+
       {/* Agent cards */}
-      {agents.map((agent) => (
+      {!isLoading && !isError && agents.length === 0 && (
+        <div style={{ padding: '40px 0', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: '14px' }}>
+          No agents configured
+        </div>
+      )}
+      {!isLoading && !isError && agents.map((agent) => (
         <AgentCard
           key={agent.agent_id}
           agent={agent}

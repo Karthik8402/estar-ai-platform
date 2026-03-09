@@ -4,9 +4,11 @@ Run with:
     uvicorn api.main:app --host 0.0.0.0 --port 8001 --reload
 """
 
+import logging
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from config.settings import get_settings
 from db.database import engine
@@ -15,6 +17,8 @@ from agents.scheduler import start_scheduler, stop_scheduler
 
 # Import route modules
 from api.routes import health, summary, activity, anomalies, integrity, reports, agents, config_routes
+
+logger = logging.getLogger("audit-trail-service")
 
 
 @asynccontextmanager
@@ -44,8 +48,25 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# ─── Global Exception Handler ─────────────────────────────
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """Catches all unhandled exceptions and returns a structured JSON error.
+    Prevents raw stack traces leaking to the frontend."""
+    logger.error(f"Unhandled error on {request.method} {request.url.path}: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": "internal_server_error",
+            "detail": str(exc) if str(exc) else "An unexpected error occurred",
+            "path": str(request.url.path),
+        },
+    )
+
+
 # ─── CORS ──────────────────────────────────────────────────
 settings = get_settings()
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.ALLOWED_ORIGINS,
@@ -53,6 +74,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 # ─── Route Registration ───────────────────────────────────
 # Mandatory contract endpoints (no prefix — mounted at root)

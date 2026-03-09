@@ -22,11 +22,14 @@ class Settings(BaseSettings):
     SERVICE_VERSION: str = "1.0.0"
     SERVICE_PORT: int = 8001
 
-    # CORS
+    # CORS — set CORS_ALLOW_ALL=true in production to allow all origins
+    CORS_ALLOW_ALL: bool = True
     ALLOWED_ORIGINS: list[str] = [
         "http://localhost:3000",
         "http://localhost:5173",
         "http://127.0.0.1:5173",
+        "https://landing-page.ambitiousforest-7d7bdb17.southeastasia.azurecontainerapps.io",
+        "https://audit-trail-service.ambitiousforest-7d7bdb17.southeastasia.azurecontainerapps.io",
     ]
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}

@@ -1,11 +1,15 @@
 import { formatDistanceToNow } from 'date-fns';
 import MetricCard from '../shared/MetricCard';
+import SectionLoader from '../shared/SectionLoader';
+import SectionError from '../shared/SectionError';
 import { useActivityFeed } from '../../hooks/useActivityFeed';
 import { useServiceSummary } from '../../hooks/useServiceSummary';
 
 export default function AuditOverview() {
-  const { data: activity = [] } = useActivityFeed(5);
-  const { data: summary } = useServiceSummary('audit-trail', '/api/audit');
+  const { data: activity = [], isLoading: activityLoading, isError: activityError } = useActivityFeed(5);
+  const { data: summary, isLoading: summaryLoading, isError: summaryError, refetch: refetchSummary } = useServiceSummary('audit-trail', '/api/audit');
+
+  const isLoading = activityLoading || summaryLoading;
 
   // Compute dynamic last run display from summary
   const lastRunStr = summary?.last_run
@@ -19,6 +23,31 @@ export default function AuditOverview() {
     { key: 'Integrity checks passed', value: String(summary?.quick_stats?.integrity_checks_passed ?? '—') },
     { key: 'Human errors detected', value: String(summary?.quick_stats?.human_errors_detected ?? '—') },
   ];
+
+  if (isLoading) {
+    return (
+      <div>
+        <h1 style={{ fontSize: '28px', fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 16px 0' }}>
+          Audit Trail &amp; Log Integrity
+        </h1>
+        <SectionLoader lines={8} label="Loading overview data…" />
+      </div>
+    );
+  }
+
+  if (summaryError) {
+    return (
+      <div>
+        <h1 style={{ fontSize: '28px', fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 16px 0' }}>
+          Audit Trail &amp; Log Integrity
+        </h1>
+        <SectionError
+          message="Could not load audit overview data."
+          onRetry={() => refetchSummary()}
+        />
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -93,7 +122,17 @@ export default function AuditOverview() {
         <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 12px 0' }}>
           Recent Activity
         </h3>
-        {activity.map((item, i, arr) => (
+        {activityError && (
+          <div style={{ padding: '12px 0', color: 'var(--text-tertiary)', fontSize: '14px' }}>
+            Activity feed unavailable
+          </div>
+        )}
+        {!activityError && activity.length === 0 && (
+          <div style={{ padding: '12px 0', color: 'var(--text-tertiary)', fontSize: '14px' }}>
+            No recent activity
+          </div>
+        )}
+        {!activityError && activity.map((item, i, arr) => (
           <div
             key={item.id}
             style={{

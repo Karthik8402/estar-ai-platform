@@ -1,6 +1,7 @@
 """GET /health — Mandatory contract endpoint (no auth)."""
 
 import time
+import logging
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
@@ -10,6 +11,7 @@ from db.models import AuditAnomaly
 from config.settings import get_settings
 
 router = APIRouter()
+logger = logging.getLogger("audit-trail-service")
 
 # Track service start time
 _start_time = time.time()
@@ -21,23 +23,25 @@ def health_check(db: Session = Depends(get_db)):
     settings = get_settings()
 
     # Quick DB check
+    db_ok = True
     try:
-        db.execute(db.bind.dialect.do_ping if hasattr(db.bind, 'dialect') else None)
-        db_ok = True
-    except Exception:
-        db_ok = True  # We're inside a working session if we got here
+        db.execute(db.get_bind().dialect.do_ping if hasattr(db.get_bind(), 'dialect') else None)
+    except Exception as e:
+        logger.warning(f"[/health] DB ping failed: {e}")
+        db_ok = False
 
     # Get last activity timestamp
-    last_anomaly = (
-        db.query(AuditAnomaly)
-        .order_by(AuditAnomaly.timestamp.desc())
-        .first()
-    )
-    last_activity = (
-        last_anomaly.timestamp.isoformat() + "Z"
-        if last_anomaly
-        else datetime.now(timezone.utc).isoformat()
-    )
+    last_activity = datetime.now(timezone.utc).isoformat()
+    try:
+        last_anomaly = (
+            db.query(AuditAnomaly)
+            .order_by(AuditAnomaly.timestamp.desc())
+            .first()
+        )
+        if last_anomaly and last_anomaly.timestamp:
+            last_activity = last_anomaly.timestamp.isoformat() + "Z"
+    except Exception as e:
+        logger.warning(f"[/health] Failed to fetch last activity: {e}")
 
     uptime = int(time.time() - _start_time)
     status = "healthy" if db_ok else "degraded"
