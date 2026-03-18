@@ -58,7 +58,7 @@ export default function AnomalyTable() {
       />
 
       {/* Loading state */}
-      {isLoading && <SectionLoader lines={5} label="Loading anomalies…" />}
+      {isLoading && <SectionLoader type="table" label="Loading anomalies…" />}
 
       {/* Error state */}
       {isError && !isLoading && (

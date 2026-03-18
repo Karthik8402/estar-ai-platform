@@ -24,14 +24,13 @@ export default function PlatformHeader({ companyName, platformName }: Props) {
 
   return (
     <header
+      className="glass-panel"
       style={{
         position: 'sticky',
         top: 0,
         zIndex: 50,
-        height: '56px',
-        background: 'var(--background)',
-        borderBottom: '1px solid var(--border)',
-        transition: 'background-color 150ms ease',
+        height: '64px', /* slightly taller */
+        transition: 'background-color 150ms ease, border-color 150ms ease',
       }}
     >
       <div

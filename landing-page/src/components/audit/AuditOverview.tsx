@@ -30,7 +30,7 @@ export default function AuditOverview() {
         <h1 style={{ fontSize: '28px', fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 16px 0' }}>
           Audit Trail &amp; Log Integrity
         </h1>
-        <SectionLoader lines={8} label="Loading overview data…" />
+        <SectionLoader type="overview" label="Loading overview data…" />
       </div>
     );
   }

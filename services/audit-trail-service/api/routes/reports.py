@@ -189,7 +189,8 @@ FORMATTING RULES:
         "You are a senior pharmaceutical compliance auditor with 15 years of experience in "
         "21 CFR Part 11 compliance. You write detailed, data-driven audit reports that reference "
         "specific events, users, and risk scores. Your reports are used by regulatory inspectors "
-        "and must be precise and thorough. Never use markdown formatting."
+        "and must be precise and thorough. Never use markdown formatting. "
+        "CRITICAL INSTRUCTION: Always completely finish your analysis and ensure you never cut off a sentence. Provide a full, conclusive report."
     )
 
     # Try Gemini AI, fall back to template if API key missing
@@ -200,7 +201,7 @@ FORMATTING RULES:
             prompt=prompt,
             system_instruction=system_instruction,
             temperature=0.3,
-            max_tokens=4000,
+            max_tokens=8192,
         )
     except Exception as e:
         print(f"❌ AI Report Generation Failed: {e}")

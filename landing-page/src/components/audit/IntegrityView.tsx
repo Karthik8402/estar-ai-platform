@@ -31,7 +31,7 @@ export default function IntegrityView() {
         <h2 style={{ fontSize: '20px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 4px 0' }}>
           Log Integrity
         </h2>
-        <SectionLoader lines={6} label="Loading integrity data…" />
+        <SectionLoader type="cards" label="Loading integrity data…" />
       </div>
     );
   }

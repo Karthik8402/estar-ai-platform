@@ -30,6 +30,7 @@ export function useGenerateReport() {
     const queryClient = useQueryClient();
 
     return useMutation<AuditReport>({
+        mutationKey: ['generateReport'],
         mutationFn: async () => {
             return await apiPost<AuditReport>('/reports/generate');
         },

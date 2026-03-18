@@ -18,14 +18,14 @@ export default function PlatformOverview() {
 
   return (
     <section
+      className="glass-panel"
       style={{
-        background: 'var(--surface)',
-        border: '1px solid var(--border)',
-        borderRadius: '12px',
-        padding: '24px',
+        borderRadius: '16px',
+        padding: '32px',
+        marginBottom: '16px',
       }}
     >
-      <h2 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '16px' }}>
+      <h2 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '20px', letterSpacing: '-0.01em' }}>
         Platform Compliance
       </h2>
 

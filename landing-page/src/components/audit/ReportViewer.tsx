@@ -3,6 +3,7 @@ import { format } from 'date-fns';
 import { useReports, useGenerateReport } from '../../hooks/audit/useReports';
 import SectionLoader from '../shared/SectionLoader';
 import SectionError from '../shared/SectionError';
+import { useIsMutating } from '@tanstack/react-query';
 
 export default function ReportViewer() {
   const { data: reports = [], isLoading, isError, refetch } = useReports();
@@ -10,7 +11,8 @@ export default function ReportViewer() {
   const [selectedId, setSelectedId] = useState<string>(reports[0]?.report_id ?? '');
 
   const selected = reports.find(r => r.report_id === selectedId) ?? reports[0];
-  const generating = generateMutation.isPending;
+  const globalMutationsCount = useIsMutating({ mutationKey: ['generateReport'] });
+  const generating = generateMutation.isPending || globalMutationsCount > 0;
 
   const handleGenerate = () => {
     generateMutation.mutate(undefined, {
@@ -21,6 +23,11 @@ export default function ReportViewer() {
       }
     });
   };
+
+  // Keep `selectedId` synced to the newest report occasionally if unmounted during gen
+  if (!selectedId && reports.length > 0) {
+    setSelectedId(reports[0].report_id);
+  }
 
   const scoreColor = (score: number) =>
     score >= 90 ? 'var(--status-online)' : score >= 70 ? 'var(--status-warning)' : 'var(--status-error)';
@@ -55,8 +62,10 @@ export default function ReportViewer() {
           {generating && (
             <span style={{
               width: '14px', height: '14px',
-              border: '2px solid rgba(255,255,255,0.3)',
-              borderTopColor: '#fff',
+              borderWidth: '2px',
+              borderStyle: 'solid',
+              borderColor: 'rgba(255,255,255,0.3)', // Base border color for the spinner
+              borderTopColor: 'var(--border-strong)',
               borderRadius: '50%',
               display: 'inline-block',
               animation: 'spin 0.8s linear infinite',
@@ -82,7 +91,7 @@ export default function ReportViewer() {
       )}
 
       {/* Loading state */}
-      {isLoading && <SectionLoader lines={4} label="Loading reports…" />}
+      {isLoading && <SectionLoader type="table" label="Loading reports…" />}
 
       {/* Error state */}
       {isError && !isLoading && (

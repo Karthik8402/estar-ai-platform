@@ -41,7 +41,7 @@ export default function AuditSettings() {
     return (
       <div>
         <h2 style={{ fontSize: '20px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 16px 0' }}>Settings</h2>
-        <SectionLoader lines={6} label="Loading settings…" />
+        <SectionLoader type="cards" label="Loading settings…" />
       </div>
     );
   }

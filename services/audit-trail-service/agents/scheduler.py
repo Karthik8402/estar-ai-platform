@@ -422,9 +422,9 @@ def start_scheduler():
     if not scheduler.running:
         logger.info("🟢 Starting background AI agent scheduler...")
 
-        scheduler.add_job(run_log_analyzer, "interval", seconds=30, id="job_agent_1", replace_existing=True)
-        scheduler.add_job(run_integrity_monitor, "interval", seconds=60, id="job_agent_2", replace_existing=True)
-        scheduler.add_job(run_compliance_reporter, "interval", seconds=120, id="job_agent_3", replace_existing=True)
+        scheduler.add_job(run_log_analyzer, "interval", seconds=30, id="job_agent_1", replace_existing=True, misfire_grace_time=60)
+        scheduler.add_job(run_integrity_monitor, "interval", seconds=60, id="job_agent_2", replace_existing=True, misfire_grace_time=60)
+        scheduler.add_job(run_compliance_reporter, "interval", seconds=120, id="job_agent_3", replace_existing=True, misfire_grace_time=60)
 
         scheduler.start()
         logger.info("🟢 All 3 agents scheduled and running")

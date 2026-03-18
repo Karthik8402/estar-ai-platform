@@ -35,42 +35,31 @@ export default function ServiceCard({ service }: Props) {
 
   return (
     <div
+      className="glass-card"
       style={{
-        background: 'var(--surface-raised)',
-        border: '1px solid var(--border)',
         borderLeft: `4px solid ${service.color}`,
-        borderRadius: '12px',
-        padding: '20px',
-        transition: 'box-shadow 200ms ease, border-color 200ms ease',
+        borderRadius: '16px',
+        padding: '24px',
         cursor: 'pointer',
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.boxShadow = 'var(--shadow-card-hover)';
-        e.currentTarget.style.borderColor = 'var(--border-strong)';
         e.currentTarget.style.borderLeftColor = service.color;
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.boxShadow = 'none';
-        e.currentTarget.style.borderColor = 'var(--border)';
         e.currentTarget.style.borderLeftColor = service.color;
       }}
     >
-      {/* Title */}
-      <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.4 }}>
-        {service.name}
-      </h3>
-      <p
-        style={{
-          fontSize: '13px',
-          color: 'var(--text-tertiary)',
-          marginTop: '2px',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-        }}
-      >
-        {service.description}
-      </p>
+      <div style={{ display: 'flex', gap: '20px', alignItems: 'center', justifyContent: 'center', textAlign: 'center', flex: 1 }}>
+        {/* Title & Desc */}
+        <div style={{ minWidth: 0 }}>
+          <h3 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.2, textShadow: '0 1px 2px rgba(255,255,255,0.5)', marginBottom: '8px' }}>
+            {service.name}
+          </h3>
+        </div>
+      </div>
 
       {/* Status + Owner row */}
       <div
@@ -137,7 +126,7 @@ export default function ServiceCard({ service }: Props) {
       )}
 
       {/* CTA */}
-      <div style={{ textAlign: 'right', marginTop: '16px' }}>
+      <div style={{ textAlign: 'right', marginTop: 'auto', paddingTop: '24px' }}>
         <button
           style={{
             background: 'none',

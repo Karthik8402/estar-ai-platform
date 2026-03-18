@@ -32,6 +32,10 @@ export default function AgentControl() {
   // Determine if any mutation is in-flight
   const anyMutating = startAgent.isPending || stopAgent.isPending || startAll.isPending || stopAll.isPending;
 
+  // Determine global running states for 'Start All' and 'Stop All' constraints
+  const allRunning = agents.length > 0 && agents.every(a => a.status === 'running');
+  const allStopped = agents.length > 0 && agents.every(a => a.status === 'stopped' || a.status === 'idle' || a.status === 'error');
+
   return (
     <div>
       {/* Header with bulk controls */}
@@ -40,7 +44,7 @@ export default function AgentControl() {
         <div style={{ display: 'flex', gap: '8px' }}>
           <button
             onClick={handleStartAll}
-            disabled={anyMutating}
+            disabled={anyMutating || allRunning}
             style={{
               background: 'var(--status-online)',
               color: 'var(--text-inverse)',
@@ -58,13 +62,14 @@ export default function AgentControl() {
           </button>
           <button
             onClick={() => setShowConfirm(true)}
-            disabled={anyMutating}
+            disabled={anyMutating || allStopped}
             style={{
-              background: 'transparent',
-              color: 'var(--status-error)',
+              background: 'linear-gradient(135deg, var(--status-error) 0%, rgba(220, 38, 38, 0.7) 100%)',
+              color: '#ffffff',
               padding: '6px 14px',
               borderRadius: '8px',
-              border: '1px solid var(--status-error)',
+              border: '1px solid rgba(255,255,255,0.2)',
+              boxShadow: '0 2px 4px rgba(220, 38, 38, 0.2)',
               fontSize: '13px',
               fontWeight: 500,
               fontFamily: 'inherit',
@@ -129,8 +134,9 @@ export default function AgentControl() {
                 style={{
                   padding: '8px 16px',
                   borderRadius: '8px',
-                  border: 'none',
-                  background: 'var(--status-error)',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  background: 'linear-gradient(135deg, var(--status-error) 0%, rgba(220, 38, 38, 0.7) 100%)',
+                  boxShadow: '0 2px 4px rgba(220, 38, 38, 0.2)',
                   color: '#fff',
                   fontSize: '13px',
                   fontWeight: 500,
@@ -146,7 +152,7 @@ export default function AgentControl() {
       )}
 
       {/* Loading state */}
-      {isLoading && <SectionLoader lines={3} label="Loading agent status…" />}
+      {isLoading && <SectionLoader type="cards" label="Loading agent status…" />}
 
       {/* Error state */}
       {isError && !isLoading && (
