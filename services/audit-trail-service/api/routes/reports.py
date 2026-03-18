@@ -13,6 +13,29 @@ router = APIRouter()
 logger = logging.getLogger("audit-trail-service")
 
 
+def _is_complete_report(text: str | None) -> bool:
+    if not text:
+        return False
+
+    trimmed = text.strip()
+    if len(trimmed) < 220:
+        return False
+
+    headers = [
+        "EXECUTIVE SUMMARY",
+        "KEY FINDINGS",
+        "METRICS SNAPSHOT",
+        "RECOMMENDATIONS",
+    ]
+    upper = trimmed.upper()
+    found = sum(1 for h in headers if h in upper)
+
+    if found < 3:
+        return False
+
+    return trimmed.endswith((".", "!", "?"))
+
+
 @router.get("/reports/summary")
 def get_reports(db: Session = Depends(get_db)):
     """Returns list of all generated reports for the ReportViewer table."""
@@ -163,26 +186,25 @@ INTEGRITY CHECK RESULTS
 ═══════════════════════════════════════════════════
 REPORT REQUIREMENTS
 ═══════════════════════════════════════════════════
-Write the report with these MANDATORY sections (use ALL-CAPS headers):
+Write a clear, concise report with these MANDATORY sections (use ALL-CAPS headers):
 
-1. EXECUTIVE SUMMARY — 2-3 sentences summarizing overall compliance posture with the exact score and total anomaly count.
+1. EXECUTIVE SUMMARY — 2 short sentences with exact score and total anomaly count.
 
-2. CRITICAL FINDINGS — Detail EVERY critical and error-level anomaly with specific event IDs, usernames, risk scores, and what regulation they violate. Reference 21 CFR Part 11 sections (e.g., 11.10(a), 11.10(b), 11.10(d), 11.10(e)).
+2. KEY FINDINGS — Focus on top issues only (up to 6 bullets), with specific event IDs, users, and risk scores.
 
-3. ANOMALY ANALYSIS — Break down the anomalies by type and severity. Include the exact counts. Identify patterns (e.g., which users have the most anomalies, what times anomalies occur).
+3. METRICS SNAPSHOT — Short severity/type counts and failed checks.
 
-4. INTEGRITY ASSESSMENT — Report on each integrity check (passed/failed) with specific details. Analyze the violations.
+4. INTEGRITY STATUS — Summarize failed checks and violations briefly.
 
-5. USER RISK ASSESSMENT — List each user and their risk profile based on the anomaly data.
-
-6. RECOMMENDATIONS — Provide 5-7 specific, actionable recommendations with priority levels (IMMEDIATE / SHORT-TERM / LONG-TERM).
+5. RECOMMENDATIONS — 4-5 practical actions with priority labels.
 
 FORMATTING RULES:
 - Use plain text only, NO markdown at all (no **, ##, etc.)
 - Use ALL-CAPS for section headers
 - Use bullet points with the • character
-- Include specific numbers, event IDs, and usernames throughout
-- Write at least 600 words
+- Keep language simple and readable for operations users
+- Keep report between 220 and 320 words
+- Include specific numbers, event IDs, and usernames where relevant
 - Use professional pharmaceutical regulatory language"""
 
     system_instruction = (
@@ -201,8 +223,13 @@ FORMATTING RULES:
             prompt=prompt,
             system_instruction=system_instruction,
             temperature=0.3,
-            max_tokens=8192,
+            max_tokens=1600,
         )
+        if not _is_complete_report(summary_text):
+            logger.warning("[/reports/generate] AI report looked incomplete; using deterministic fallback")
+            summary_text = _generate_fallback_report(
+                total_anomalies, compliance_score, recent_anomalies, violations
+            )
     except Exception as e:
         print(f"❌ AI Report Generation Failed: {e}")
         # Fallback: generate a template report without AI
@@ -261,24 +288,28 @@ def _generate_fallback_report(
         for v in violations
     ])
 
-    return f"""On-demand compliance report generated on {now}. The audit trail system is currently operating with a compliance score of {compliance_score}%.
+    return f"""EXECUTIVE SUMMARY
 
-CRITICAL FINDINGS
+This {now} compliance snapshot shows an overall score of {compliance_score}% with {total_anomalies} anomalies currently recorded. Immediate attention is required for unresolved integrity and access-control findings.
 
-{violation_items if violation_items else "• No critical violations detected during this period."}
+KEY FINDINGS
 
-OPERATIONAL SUMMARY
+{violation_items if violation_items else "• No critical integrity violations were found in this interval."}
 
-• Total anomalies detected: {total_anomalies}
-• Overall compliance score: {compliance_score}%
-• Report generated without AI analysis (Gemini API key not configured)
+METRICS SNAPSHOT
 
-RECENT ANOMALIES
+• Total anomalies: {total_anomalies}
+• Compliance score: {compliance_score}%
+• Data source: operational audit database
 
-{anomaly_items if anomaly_items else "• No recent anomalies."}
+RECENT EVENTS
+
+{anomaly_items if anomaly_items else "• No high-priority recent anomalies."}
 
 RECOMMENDATIONS
 
-• Review any flagged anomalies in the Anomalies section of the dashboard
-• Ensure all critical actions have associated electronic signatures
-• Configure GEMINI_API_KEY in .env for AI-powered report generation"""
+• IMMEDIATE: Review high-severity anomalies in the Anomalies view and assign owners.
+• IMMEDIATE: Resolve any missing electronic signatures on critical actions.
+• SHORT-TERM: Revalidate RBAC permissions for users in violations.
+• SHORT-TERM: Confirm off-hours action controls are enforced.
+• LONG-TERM: Enable AI provider configuration for enriched narrative reports."""

@@ -8,6 +8,7 @@ Three agents run continuously via APScheduler:
 
 import uuid
 import logging
+import random
 from datetime import datetime, timedelta, timezone
 from collections import Counter
 
@@ -16,10 +17,12 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, and_
 
 from db.database import SessionLocal
+from config.settings import get_settings
 from db.models import (
     AgentConfig, AuditAnomaly, AuditThreshold, AuditReport,
     IntegrityCheck, IntegrityViolation,
     FactAuditEvent, DimAction, DimUser, DimTime, DimSession,
+    DimModule,
 )
 
 logger = logging.getLogger("agents")
@@ -171,9 +174,19 @@ async def run_integrity_monitor():
             return
 
         now = datetime.now(timezone.utc)
+        # Use a rolling window so score reflects recent behavior and can recover.
+        window_start = agent.last_run or (now - timedelta(minutes=15))
+        if window_start.tzinfo is None:
+            window_start = window_start.replace(tzinfo=timezone.utc)
+        window_start_naive = window_start.replace(tzinfo=None)
 
         # ── Check 1: Sequential event numbering ──
-        all_events = db.query(FactAuditEvent).order_by(FactAuditEvent.created_at).all()
+        all_events = (
+            db.query(FactAuditEvent)
+            .filter(FactAuditEvent.created_at >= window_start_naive)
+            .order_by(FactAuditEvent.created_at)
+            .all()
+        )
         seq_passed = True
         seq_detail = "Passed"
 
@@ -199,6 +212,7 @@ async def run_integrity_monitor():
             .join(DimAction, FactAuditEvent.action_id == DimAction.action_id)
             .join(DimUser, FactAuditEvent.user_id == DimUser.user_id)
             .filter(DimAction.requires_e_signature == True)
+            .filter(FactAuditEvent.created_at >= window_start_naive)
             .all()
         )
 
@@ -237,6 +251,7 @@ async def run_integrity_monitor():
             .join(DimUser, FactAuditEvent.user_id == DimUser.user_id)
             .filter(DimAction.action_category == "admin")
             .filter(FactAuditEvent.is_compliant == False)
+            .filter(FactAuditEvent.created_at >= window_start_naive)
             .all()
         )
 
@@ -267,6 +282,7 @@ async def run_integrity_monitor():
         events_with_time = (
             db.query(FactAuditEvent, DimTime)
             .join(DimTime, FactAuditEvent.timestamp_id == DimTime.time_id)
+            .filter(FactAuditEvent.created_at >= window_start_naive)
             .order_by(DimTime.full_timestamp)
             .all()
         )
@@ -326,6 +342,40 @@ def _upsert_check(db: Session, name: str, passed: bool, detail: str, checked_at:
             detail=detail,
             checked_at=checked_at,
         ))
+
+
+def _get_or_create_time_dim(db: Session, timestamp: datetime) -> DimTime:
+    time_value = timestamp.replace(tzinfo=None)
+    existing = db.query(DimTime).filter(DimTime.full_timestamp == time_value).first()
+    if existing:
+        return existing
+
+    time_dim = DimTime(
+        full_timestamp=time_value,
+        year=time_value.year,
+        month=time_value.month,
+        day=time_value.day,
+        hour=time_value.hour,
+        minute=time_value.minute,
+        day_of_week=time_value.strftime("%A"),
+        is_off_hours=time_value.hour < 6 or time_value.hour >= 22,
+    )
+    db.add(time_dim)
+    db.flush()
+    return time_dim
+
+
+def _ensure_session(db: Session) -> DimSession:
+    session = DimSession(
+        ip_address=f"10.0.{random.randint(0, 4)}.{random.randint(1, 254)}",
+        device_fingerprint=f"fp_{uuid.uuid4().hex[:12]}",
+        geo_location="US-East",
+        created_at=datetime.utcnow(),
+        last_used_at=datetime.utcnow(),
+    )
+    db.add(session)
+    db.flush()
+    return session
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -414,6 +464,93 @@ async def run_compliance_reporter():
 
 
 # ═══════════════════════════════════════════════════════════════════
+# DATA SIMULATOR: Periodic event generation
+# ═══════════════════════════════════════════════════════════════════
+
+async def run_data_simulator():
+    """Insert periodic demo events so agents always have fresh data to scan."""
+    db: Session = SessionLocal()
+    settings = get_settings()
+    try:
+        running_agents = (
+            db.query(func.count(AgentConfig.id))
+            .filter(AgentConfig.agent_id.in_(["agent_1", "agent_2", "agent_3"]))
+            .filter(AgentConfig.status == "running")
+            .scalar() or 0
+        )
+        if running_agents == 0:
+            logger.info("[SIMULATOR] Skipped (all agents stopped)")
+            return
+
+        users = db.query(DimUser).all()
+        actions = db.query(DimAction).all()
+        modules = db.query(DimModule).all()
+        sessions = db.query(DimSession).all()
+
+        if not users or not actions or not modules:
+            return
+
+        if not sessions:
+            sessions = [_ensure_session(db)]
+
+        now = datetime.now(timezone.utc).replace(second=0, microsecond=0)
+        batch_size = max(1, int(settings.SIMULATION_EVENT_BATCH))
+
+        burst_user = random.choice(users)
+        login_action = next((a for a in actions if a.action_name == "login_attempt"), None)
+
+        # Deterministic burst ensures Agent 1 can detect repeated failed logins.
+        if login_action:
+            for _ in range(4):
+                burst_time = now
+                burst_dim = _get_or_create_time_dim(db, burst_time)
+                burst_session = random.choice(sessions)
+                db.add(FactAuditEvent(
+                    timestamp_id=burst_dim.time_id,
+                    user_id=burst_user.user_id,
+                    action_id=login_action.action_id,
+                    module_id=random.choice(modules).module_id,
+                    session_id=burst_session.session_id,
+                    risk_score=round(random.uniform(72, 94), 2),
+                    is_compliant=False,
+                    created_at=datetime.utcnow(),
+                ))
+
+        for _ in range(batch_size):
+            event_time = now
+            time_dim = _get_or_create_time_dim(db, event_time)
+            action = random.choice(actions)
+            user = random.choice(users)
+            module = random.choice(modules)
+            session = random.choice(sessions)
+
+            risk_score = round(random.uniform(10, 95), 2)
+            is_compliant = random.random() > 0.08
+
+            if action.action_name == "login_attempt" and random.random() < 0.4:
+                is_compliant = False
+
+            db.add(FactAuditEvent(
+                timestamp_id=time_dim.time_id,
+                user_id=user.user_id,
+                action_id=action.action_id,
+                module_id=module.module_id,
+                session_id=session.session_id,
+                risk_score=risk_score,
+                is_compliant=is_compliant,
+                created_at=datetime.utcnow(),
+            ))
+
+        db.commit()
+        logger.info(f"[SIMULATOR] Inserted {batch_size} demo audit events")
+    except Exception as e:
+        logger.error(f"[SIMULATOR] Error: {e}", exc_info=True)
+        db.rollback()
+    finally:
+        db.close()
+
+
+# ═══════════════════════════════════════════════════════════════════
 # SCHEDULER LIFECYCLE
 # ═══════════════════════════════════════════════════════════════════
 
@@ -422,9 +559,19 @@ def start_scheduler():
     if not scheduler.running:
         logger.info("🟢 Starting background AI agent scheduler...")
 
+        settings = get_settings()
+
         scheduler.add_job(run_log_analyzer, "interval", seconds=30, id="job_agent_1", replace_existing=True, misfire_grace_time=60)
         scheduler.add_job(run_integrity_monitor, "interval", seconds=60, id="job_agent_2", replace_existing=True, misfire_grace_time=60)
         scheduler.add_job(run_compliance_reporter, "interval", seconds=120, id="job_agent_3", replace_existing=True, misfire_grace_time=60)
+        scheduler.add_job(
+            run_data_simulator,
+            "interval",
+            seconds=max(180, int(settings.SIMULATION_INTERVAL_SECONDS)),
+            id="job_data_simulator",
+            replace_existing=True,
+            misfire_grace_time=120,
+        )
 
         scheduler.start()
         logger.info("🟢 All 3 agents scheduled and running")

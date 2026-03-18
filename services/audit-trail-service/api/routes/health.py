@@ -5,10 +5,12 @@ import logging
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 
 from db.database import get_db
 from db.models import AuditAnomaly
 from config.settings import get_settings
+from shared_ai.factory import get_ai_provider
 
 router = APIRouter()
 logger = logging.getLogger("audit-trail-service")
@@ -25,7 +27,9 @@ def health_check(db: Session = Depends(get_db)):
     # Quick DB check
     db_ok = True
     try:
-        db.execute(db.get_bind().dialect.do_ping if hasattr(db.get_bind(), 'dialect') else None)
+        bind = db.get_bind()
+        with bind.connect() as conn:
+            conn.execute(text("SELECT 1"))
     except Exception as e:
         logger.warning(f"[/health] DB ping failed: {e}")
         db_ok = False
@@ -46,10 +50,24 @@ def health_check(db: Session = Depends(get_db)):
     uptime = int(time.time() - _start_time)
     status = "healthy" if db_ok else "degraded"
 
+    # AI readiness check (non-blocking for service health)
+    ai_provider = settings.AI_PROVIDER
+    ai_ready = False
+    ai_status = "not_configured"
+    try:
+        _ = get_ai_provider()
+        ai_ready = True
+        ai_status = "ready"
+    except Exception as e:
+        ai_status = str(e)
+
     return {
         "status": status,
         "service_name": settings.SERVICE_NAME,
         "version": settings.SERVICE_VERSION,
         "uptime_seconds": uptime,
         "last_activity": last_activity,
+        "ai_provider": ai_provider,
+        "ai_ready": ai_ready,
+        "ai_status": ai_status,
     }

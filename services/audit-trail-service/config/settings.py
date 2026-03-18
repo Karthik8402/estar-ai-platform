@@ -6,10 +6,10 @@ from functools import lru_cache
 
 class Settings(BaseSettings):
     # Database
-    DATABASE_URL: str = "postgresql://epharmic:password@localhost:5432/epharmic_db"
+    DATABASE_URL: str = "postgresql://<db_user>:<db_password>@localhost:5432/<db_name>"
 
     # JWT (deferred — not enforced yet)
-    JWT_SECRET: str = "dev-secret-key-change-in-production"
+    JWT_SECRET: str = "change-me-in-development"
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRY_MINUTES: int = 15
 
@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     SERVICE_NAME: str = "audit-trail-service"
     SERVICE_VERSION: str = "1.0.0"
     SERVICE_PORT: int = 8001
+
+    # Demo data simulator
+    SIMULATION_INTERVAL_SECONDS: int = 240
+    SIMULATION_EVENT_BATCH: int = 8
 
     # CORS — set CORS_ALLOW_ALL=true in production to allow all origins
     CORS_ALLOW_ALL: bool = True

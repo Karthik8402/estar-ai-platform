@@ -7,7 +7,7 @@ from sqlalchemy import func
 from math import ceil
 
 from db.database import get_db
-from db.models import AuditAnomaly
+from db.models import AuditAnomaly, AgentConfig
 
 router = APIRouter()
 logger = logging.getLogger("audit-trail-service")
@@ -68,11 +68,19 @@ def get_anomalies(
                 "raw_payload": a.raw_payload or {},
             })
 
+        # Use Agent 1 run time as authoritative anomaly "last check" timestamp.
+        agent_last_run = (
+            db.query(AgentConfig.last_run)
+            .filter(AgentConfig.agent_id == "agent_1")
+            .scalar()
+        )
+
         return {
             "items": items,
             "total": total,
             "page": page,
             "totalPages": total_pages,
+            "last_check": agent_last_run.isoformat() + "Z" if agent_last_run else None,
         }
 
     except Exception as e:

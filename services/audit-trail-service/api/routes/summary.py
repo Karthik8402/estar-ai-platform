@@ -42,14 +42,15 @@ def get_summary(db: Session = Depends(get_db)):
             else datetime.now(timezone.utc).isoformat()
         )
 
-        # Compliance score: based on integrity checks
-        total_checks = db.query(func.count(IntegrityCheck.id)).scalar() or 1
+        # Integrity score: based on integrity checks
+        total_checks = db.query(func.count(IntegrityCheck.id)).scalar() or 0
         passed_checks = (
             db.query(func.count(IntegrityCheck.id))
             .filter(IntegrityCheck.passed == True)
             .scalar() or 0
         )
-        compliance_score = int((passed_checks / total_checks) * 100) if total_checks > 0 else 0
+        integrity_score = int((passed_checks / total_checks) * 100) if total_checks > 0 else 100
+        integrity_score = max(0, min(100, integrity_score))
 
         # Quick stats
         total_anomalies = db.query(func.count(AuditAnomaly.id)).scalar() or 0
@@ -59,11 +60,14 @@ def get_summary(db: Session = Depends(get_db)):
             "total_processed": total_processed,
             "alerts_today": alerts_today,
             "last_run": last_run,
-            "compliance_score": compliance_score,
+            # Keep both keys for backward compatibility with existing UI code.
+            "integrity_score": integrity_score,
+            "compliance_score": integrity_score,
             "quick_stats": {
                 "logs_analyzed_today": total_processed,
                 "anomalies_flagged": total_anomalies,
                 "integrity_checks_passed": integrity_passed,
+                "integrity_score": integrity_score,
                 "human_errors_detected": (
                     db.query(func.count(AuditAnomaly.id))
                     .filter(AuditAnomaly.anomaly_type == "human_error")

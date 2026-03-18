@@ -3,10 +3,14 @@ import { formatDistanceToNow } from 'date-fns';
 import { useIntegrity } from '../../hooks/audit/useIntegrity';
 import SectionLoader from '../shared/SectionLoader';
 import SectionError from '../shared/SectionError';
+import PaginationBar from '../shared/PaginationBar';
 
 export default function IntegrityView() {
   const { data, isLoading, isError, refetch } = useIntegrity();
   const [barWidth, setBarWidth] = useState(0);
+  const [violationPage, setViolationPage] = useState(1);
+  const [expandedCheck, setExpandedCheck] = useState<string | null>(null);
+  const VIOLATIONS_PAGE_SIZE = 8;
 
   const integrity_score = data?.integrity_score ?? 0;
   const entries_verified = data?.entries_verified ?? 0;
@@ -14,16 +18,48 @@ export default function IntegrityView() {
   const checks = data?.checks ?? [];
   const last_check = data?.last_check ?? new Date().toISOString();
 
+  const violationTotalPages = Math.max(1, Math.ceil(violations.length / VIOLATIONS_PAGE_SIZE));
+  const safeViolationPage = Math.min(violationPage, violationTotalPages);
+  const violationStart = (safeViolationPage - 1) * VIOLATIONS_PAGE_SIZE;
+  const violationEnd = violationStart + VIOLATIONS_PAGE_SIZE;
+  const pagedViolations = violations.slice(violationStart, violationEnd);
+  const violationEmptyRows = Math.max(0, VIOLATIONS_PAGE_SIZE - pagedViolations.length);
+
   useEffect(() => {
     const timer = setTimeout(() => setBarWidth(integrity_score), 100);
     return () => clearTimeout(timer);
   }, [integrity_score]);
+
+  useEffect(() => {
+    if (violationPage > violationTotalPages) {
+      setViolationPage(violationTotalPages);
+    }
+  }, [violationPage, violationTotalPages]);
 
   const barColor = integrity_score >= 90
     ? 'var(--status-online)'
     : integrity_score >= 70
       ? 'var(--status-warning)'
       : 'var(--status-error)';
+
+  const getRelatedViolations = (checkName: string) => {
+    const name = checkName.toLowerCase();
+
+    if (name.includes('electronic signatures')) {
+      return violations.filter(v => v.type === 'missing_signature');
+    }
+    if (name.includes('rbac')) {
+      return violations.filter(v => v.type === 'rbac_violation');
+    }
+    if (name.includes('timestamp')) {
+      return violations.filter(v => v.type === 'timestamp_gap');
+    }
+    if (name.includes('checksum')) {
+      return violations.filter(v => v.type.includes('checksum'));
+    }
+
+    return [];
+  };
 
   if (isLoading) {
     return (
@@ -105,6 +141,7 @@ export default function IntegrityView() {
           borderRadius: '12px',
           marginBottom: '24px',
           overflow: 'hidden',
+          minHeight: '620px',
         }}
       >
         <div style={{ padding: '16px 20px 12px', borderBottom: '1px solid var(--border)' }}>
@@ -117,32 +154,57 @@ export default function IntegrityView() {
             No violations detected
           </div>
         )}
-        {violations.map((v, i) => (
+        {pagedViolations.map((v, i) => (
           <div
             key={i}
             style={{
               padding: '14px 20px',
-              borderBottom: i < violations.length - 1 ? '1px solid var(--border)' : 'none',
+              borderBottom: i < pagedViolations.length - 1 ? '1px solid var(--border)' : 'none',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-              <span style={{
-                color: v.severity === 'error' ? 'var(--status-error)' : 'var(--status-warning)',
-                lineHeight: 1.4,
-              }}>●</span>
-              <div>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <span style={{
+                  fontSize: '10px',
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.06em',
+                  padding: '2px 6px',
+                  borderRadius: '4px',
+                  color: v.severity === 'error' ? 'var(--status-error)' : 'var(--status-warning)',
+                  background: v.severity === 'error' ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.12)',
+                }}>
+                  {v.type.replace('_', ' ')}
+                </span>
                 <div style={{ fontSize: '14px', color: 'var(--text-primary)' }}>{v.message}</div>
-                <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                  {v.user && <span>User: {v.user}</span>}
-                  {v.user && v.action && <span>·</span>}
-                  {v.action && <span>Action: {v.action}</span>}
-                  <span>·</span>
-                  <span>{new Date(v.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZoneName: 'short' })}</span>
-                </div>
+              </div>
+              <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                {v.user && <span>User: {v.user}</span>}
+                {v.user && v.action && <span>·</span>}
+                {v.action && <span>Action: {v.action}</span>}
+                <span>·</span>
+                <span>{new Date(v.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZoneName: 'short' })}</span>
               </div>
             </div>
           </div>
         ))}
+
+        {pagedViolations.length > 0 && Array.from({ length: violationEmptyRows }).map((_, idx) => (
+          <div key={`violation-empty-${idx}`} style={{ height: '96px', borderBottom: idx < violationEmptyRows - 1 ? '1px solid var(--border)' : 'none' }} />
+        ))}
+
+        {violations.length > 0 && (
+          <PaginationBar
+            start={violationStart + 1}
+            end={Math.min(violationEnd, violations.length)}
+            total={violations.length}
+            page={safeViolationPage}
+            totalPages={violationTotalPages}
+            onPrev={() => setViolationPage((p) => Math.max(1, p - 1))}
+            onNext={() => setViolationPage((p) => Math.min(violationTotalPages, p + 1))}
+            className="integrity-pagination-shell"
+          />
+        )}
       </div>
 
       {/* Checks performed */}
@@ -163,31 +225,68 @@ export default function IntegrityView() {
           </div>
         )}
         {checks.map((check, i) => {
+          const relatedViolations = getRelatedViolations(check.name);
+          const hasExpandableDetails = (!check.passed || check.detail.toLowerCase().includes('warning')) && relatedViolations.length > 0;
+          const isExpanded = expandedCheck === check.name;
           const resultColor = check.passed
-            ? (check.detail.includes('warnings') ? 'var(--status-warning)' : 'var(--status-online)')
+            ? (check.detail.toLowerCase().includes('warning') ? 'var(--status-warning)' : 'var(--status-online)')
             : 'var(--status-error)';
           return (
             <div
               key={i}
               style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                padding: '8px 0',
+                padding: '8px 0 10px',
                 borderBottom: i < checks.length - 1 ? '1px solid var(--border)' : 'none',
               }}
             >
-              <span style={{ fontSize: '14px', color: 'var(--text-primary)' }}>
-                <span style={{
-                  color: check.passed ? 'var(--status-online)' : 'var(--status-error)',
-                  marginRight: '6px',
-                }}>
-                  {check.passed ? '✓' : '✗'}
+              <div
+                onClick={() => {
+                  if (hasExpandableDetails) {
+                    setExpandedCheck((prev) => prev === check.name ? null : check.name);
+                  }
+                }}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: '12px',
+                  cursor: hasExpandableDetails ? 'pointer' : 'default',
+                }}
+              >
+                <span style={{ fontSize: '14px', color: 'var(--text-primary)' }}>
+                  <span style={{
+                    color: check.passed ? 'var(--status-online)' : 'var(--status-error)',
+                    marginRight: '6px',
+                  }}>
+                    {check.passed ? '✓' : '✗'}
+                  </span>
+                  {check.name}
                 </span>
-                {check.name}
-              </span>
-              <span style={{ fontSize: '14px', color: resultColor, textAlign: 'right' }}>
-                {check.detail}
-              </span>
+                <span style={{ fontSize: '14px', color: resultColor, textAlign: 'right', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                  {check.detail}
+                  {hasExpandableDetails && <span style={{ color: 'var(--text-tertiary)' }}>{isExpanded ? '▲' : '▼'}</span>}
+                </span>
+              </div>
+
+              {isExpanded && hasExpandableDetails && (
+                <div style={{ marginTop: '8px', marginLeft: '22px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {relatedViolations.slice(0, 6).map((v, idx) => (
+                    <div key={`${v.type}-${idx}`} style={{
+                      fontSize: '13px',
+                      color: 'var(--text-secondary)',
+                      background: 'var(--surface-raised)',
+                      border: '1px solid var(--border)',
+                      borderRadius: '8px',
+                      padding: '8px 10px',
+                    }}>
+                      <span style={{ color: v.severity === 'error' ? 'var(--status-error)' : 'var(--status-warning)', fontWeight: 600 }}>
+                        {v.type.replace('_', ' ').toUpperCase()}:
+                      </span>{' '}
+                      {v.message}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           );
         })}

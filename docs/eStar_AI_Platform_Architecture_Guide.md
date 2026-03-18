@@ -488,24 +488,24 @@ The `service-registry.json` is the centralized configuration for all microservic
 # .env.example — Required environment variables
 
 # Database
-DATABASE_URL=postgresql://epharmic:password@postgres:5432/epharmic_db
+DATABASE_URL=postgresql://<db_user>:<db_password>@postgres:5432/<db_name>
 
 # JWT Authentication
-JWT_SECRET=your-256-bit-secret-key
+JWT_SECRET=change-me-in-development
 JWT_ALGORITHM=HS256
 JWT_EXPIRY_MINUTES=15
 REFRESH_TOKEN_DAYS=7
 
 # AI Provider (switch without code changes)
 AI_PROVIDER=gemini          # Options: gemini, openai, azure, anthropic, ollama
-GEMINI_API_KEY=your-key     # Free during development
+GEMINI_API_KEY=your-gemini-api-key-here
 OPENAI_API_KEY=             # For production
 
 # Gateway
 VITE_API_GATEWAY_URL=http://localhost:8000
 
 # Database passwords
-DB_PASSWORD=your-db-password
+DB_PASSWORD=change-me-in-development
 ```
 
 ---
@@ -674,7 +674,7 @@ alembic downgrade -1
 
 ```bash
 # Development (PostgreSQL)
-DATABASE_URL=postgresql://epharmic:password@localhost:5432/epharmic_db
+DATABASE_URL=postgresql://<db_user>:<db_password>@localhost:5432/<db_name>
 
 # Production (Snowflake)
 DATABASE_URL=snowflake://user:pass@account/db/schema

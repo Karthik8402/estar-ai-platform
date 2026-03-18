@@ -53,6 +53,7 @@ export interface SummaryData {
     alerts_today: number;
     last_run: string;
     compliance_score: number;
+    integrity_score?: number;
     quick_stats: Record<string, number>;
 }
 
@@ -62,6 +63,7 @@ const SIMULATED_SUMMARY: Record<string, SummaryData> = {
         alerts_today: 3,
         last_run: new Date(Date.now() - 120000).toISOString(),
         compliance_score: 94,
+        integrity_score: 94,
         quick_stats: { logs_analyzed_today: 890, anomalies_flagged: 3, integrity_checks_passed: 887 },
     },
     'stability-report': {
@@ -69,6 +71,7 @@ const SIMULATED_SUMMARY: Record<string, SummaryData> = {
         alerts_today: 0,
         last_run: new Date(Date.now() - 600000).toISOString(),
         compliance_score: 98,
+        integrity_score: 98,
         quick_stats: { reports_generated: 47, pending_reviews: 2 },
     },
     'oot-alerting': {
@@ -76,6 +79,7 @@ const SIMULATED_SUMMARY: Record<string, SummaryData> = {
         alerts_today: 0,
         last_run: new Date(Date.now() - 7200000).toISOString(),
         compliance_score: 0,
+        integrity_score: 0,
         quick_stats: {},
     },
     'data-entry': {
@@ -83,6 +87,7 @@ const SIMULATED_SUMMARY: Record<string, SummaryData> = {
         alerts_today: 2,
         last_run: new Date(Date.now() - 60000).toISOString(),
         compliance_score: 87,
+        integrity_score: 87,
         quick_stats: { entries_validated: 892, errors_caught: 14 },
     },
 };

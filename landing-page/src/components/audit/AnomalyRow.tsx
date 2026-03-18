@@ -28,7 +28,7 @@ export default function AnomalyRow({ anomaly }: Props) {
     <>
       <tr
         onClick={() => setExpanded(!expanded)}
-        style={{ cursor: 'pointer', transition: 'background 100ms ease' }}
+        style={{ cursor: 'pointer', transition: 'background 100ms ease', height: '84px' }}
         onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--surface)'; }}
         onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
       >
@@ -53,20 +53,19 @@ export default function AnomalyRow({ anomaly }: Props) {
         >
           {anomaly.anomaly_type}
         </td>
-        <td
-          style={{
-            padding: '12px 16px',
-            borderBottom: expanded ? 'none' : '1px solid var(--border)',
-            fontSize: '14px',
-            color: 'var(--text-primary)',
-            overflow: 'hidden',
-            display: '-webkit-box',
-            WebkitLineClamp: 2,
-            WebkitBoxOrient: 'vertical',
-            maxWidth: '400px',
-          }}
-        >
-          {anomaly.message}
+        <td style={{ padding: '12px 16px', borderBottom: expanded ? 'none' : '1px solid var(--border)', fontSize: '14px', color: 'var(--text-primary)' }}>
+          <div
+            style={{
+              overflow: 'hidden',
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
+              lineHeight: 1.45,
+              maxHeight: '2.9em',
+            }}
+          >
+            {anomaly.message}
+          </div>
         </td>
         <td
           style={{

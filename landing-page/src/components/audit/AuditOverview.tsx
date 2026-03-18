@@ -75,7 +75,7 @@ export default function AuditOverview() {
       <div className="grid grid-cols-2 md:grid-cols-4" style={{ gap: '16px', marginBottom: '24px' }}>
         <MetricCard value={summary?.total_processed ?? 0} label="LOGS ANALYZED" />
         <MetricCard value={summary?.alerts_today ?? 0} label="ALERTS TODAY" accent="warning" />
-        <MetricCard value={summary?.compliance_score ?? 0} label="COMPLIANCE SCORE" suffix="%" />
+        <MetricCard value={summary?.integrity_score ?? summary?.compliance_score ?? 0} label="INTEGRITY SCORE" suffix="%" />
         <MetricCard value={summary?.quick_stats?.integrity_checks_passed ?? 0} label="INTEGRITY PASSED" />
       </div>
 
@@ -103,7 +103,20 @@ export default function AuditOverview() {
             }}
           >
             <span style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>{row.key}</span>
-            <span className="font-mono" style={{ fontSize: '14px', color: 'var(--text-primary)', fontWeight: 500 }}>
+            <span
+              className="font-mono"
+              title={row.value}
+              style={{
+                fontSize: '14px',
+                color: 'var(--text-primary)',
+                fontWeight: 500,
+                maxWidth: '55%',
+                textAlign: 'right',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+            >
               {row.value}
             </span>
           </div>

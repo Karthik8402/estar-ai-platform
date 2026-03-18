@@ -13,7 +13,7 @@ services:
     environment:
       POSTGRES_DB: epharmic_db
       POSTGRES_USER: epharmic
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-password}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-change-me-in-development}
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -44,7 +44,7 @@ services:
     restart: unless-stopped
     ports: [ "8001:8001" ]
     environment:
-      - DATABASE_URL=postgresql://epharmic:${DB_PASSWORD:-password}@postgres:5432/epharmic_db
+      - DATABASE_URL=postgresql://epharmic:${DB_PASSWORD:-change-me-in-development}@postgres:5432/epharmic_db
       - AI_PROVIDER=gemini
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - SERVICE_PORT=8001

@@ -14,6 +14,7 @@ interface AnomalyResponse {
     total: number;
     page: number;
     totalPages: number;
+    last_check?: string | null;
 }
 
 export function useAnomalies(
@@ -41,6 +42,7 @@ export function useAnomalies(
             }
         },
         placeholderData: (prev) => prev, // keep previous data during pagination
+        refetchInterval: 15_000,
         staleTime: 20_000,
     });
 }

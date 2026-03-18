@@ -17,13 +17,13 @@ function Pill({ label, active, onClick }: { label: string; active: boolean; onCl
     <button
       onClick={onClick}
       style={{
-        padding: '4px 12px',
+        padding: '3px 10px',
         borderRadius: '9999px',
         border: `1px solid ${active ? 'var(--brand)' : 'var(--border)'}`,
         background: active ? 'linear-gradient(135deg, var(--brand) 0%, rgba(30, 41, 59, 0.6) 100%)' : 'transparent',
         color: active ? '#ffffff' : 'var(--text-secondary)',
         fontWeight: active ? 500 : 400,
-        fontSize: '13px',
+        fontSize: '11px',
         fontFamily: 'inherit',
         cursor: 'pointer',
         transition: 'all 150ms ease',
@@ -42,14 +42,14 @@ export default function FilterBar({ activeSeverity, activeType, search, onSeveri
         <Pill key={s} label={s === 'all' ? 'All' : s.toUpperCase()} active={activeSeverity === s} onClick={() => onSeverityChange(s)} />
       ))}
 
-      <span style={{ color: 'var(--text-tertiary)', margin: '0 4px' }}>·</span>
+      <span style={{ color: 'var(--text-tertiary)', margin: '0 4px', fontSize: '12px' }}>|</span>
 
       {/* Type pills */}
       {TYPES.map((t) => (
         <Pill key={t} label={t === 'all' ? 'All Types' : t} active={activeType === t} onClick={() => onTypeChange(t)} />
       ))}
 
-      <span style={{ color: 'var(--text-tertiary)', margin: '0 4px' }}>·</span>
+      <span style={{ color: 'var(--text-tertiary)', margin: '0 4px', fontSize: '12px' }}>|</span>
 
       {/* Search */}
       <input

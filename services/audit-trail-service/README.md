@@ -35,7 +35,7 @@ Ensure you add your `GEMINI_API_KEY` to the `.env` file. Do NOT commit the `.env
 
 Start your PostgreSQL instance. If you are using Docker, run:
 ```bash
-docker run -d --name epharmic-pg -e POSTGRES_DB=epharmic_db -e POSTGRES_USER=epharmic -e POSTGRES_PASSWORD=password -p 5432:5432 postgres:15
+docker run -d --name epharmic-pg -e POSTGRES_DB=epharmic_db -e POSTGRES_USER=epharmic -e POSTGRES_PASSWORD=change-me-in-development -p 5432:5432 postgres:15
 ```
 
 Install the Python dependencies:

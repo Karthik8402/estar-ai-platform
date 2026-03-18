@@ -29,10 +29,12 @@ export function useReports() {
 export function useGenerateReport() {
     const queryClient = useQueryClient();
 
-    return useMutation<AuditReport>({
+    return useMutation<AuditReport, unknown, string | undefined>({
         mutationKey: ['generateReport'],
-        mutationFn: async () => {
-            return await apiPost<AuditReport>('/reports/generate');
+        mutationFn: async (reportType) => {
+            const trimmed = reportType?.trim();
+            const query = trimmed ? `?report_type=${encodeURIComponent(trimmed)}` : '';
+            return await apiPost<AuditReport>(`/reports/generate${query}`);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['audit', 'reports'] });

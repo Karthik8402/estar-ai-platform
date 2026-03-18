@@ -1,10 +1,12 @@
 import { useState } from 'react';
+import { formatDistanceToNow } from 'date-fns';
 import { useAnomalies } from '../../hooks/audit/useAnomalies';
 import { getAnomalies as getSimulatedAnomalies } from '../../config/simulatedAuditData';
 import FilterBar from './FilterBar';
 import AnomalyRow from './AnomalyRow';
 import SectionLoader from '../shared/SectionLoader';
 import SectionError from '../shared/SectionError';
+import PaginationBar from '../shared/PaginationBar';
 
 export default function AnomalyTable() {
   const [page, setPage] = useState(1);
@@ -17,6 +19,7 @@ export default function AnomalyTable() {
   const items = data?.items ?? [];
   const total = data?.total ?? 0;
   const totalPages = data?.totalPages ?? 1;
+  const lastCheck = data?.last_check;
 
   const handleExport = () => {
     const header = 'Event ID,Timestamp,Severity,Type,Message,User,Risk Score\n';
@@ -34,6 +37,7 @@ export default function AnomalyTable() {
 
   const start = (page - 1) * limit + 1;
   const end = Math.min(page * limit, total);
+  const emptyRows = Math.max(0, limit - items.length);
 
   return (
     <div>
@@ -42,7 +46,11 @@ export default function AnomalyTable() {
         <div>
           <h2 style={{ fontSize: '20px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>Anomalies</h2>
           <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '4px 0 0 0' }}>
-            {isLoading ? 'Loading…' : items.length > 0 ? `${total} flagged` : 'No anomalies match your filters'}
+            {isLoading
+              ? 'Running anomaly checks…'
+              : lastCheck
+                ? `Last check: ${formatDistanceToNow(new Date(lastCheck), { addSuffix: true })}`
+                : 'Last check: unavailable'}
           </p>
         </div>
       </div>
@@ -77,10 +85,17 @@ export default function AnomalyTable() {
               border: '1px solid var(--border)',
               borderRadius: '12px',
               overflow: 'hidden',
+              minHeight: '620px',
             }}
           >
             <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '600px' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '600px', tableLayout: 'fixed' }}>
+                <colgroup>
+                  <col style={{ width: '140px' }} />
+                  <col style={{ width: '190px' }} />
+                  <col />
+                  <col style={{ width: '170px' }} />
+                </colgroup>
                 <thead>
                   <tr style={{ borderBottom: '2px solid var(--border)' }}>
                     {['Severity', 'Type', 'Message', 'Time'].map((h) => (
@@ -113,6 +128,11 @@ export default function AnomalyTable() {
                       </td>
                     </tr>
                   )}
+                  {items.length > 0 && Array.from({ length: emptyRows }).map((_, idx) => (
+                    <tr key={`empty-row-${idx}`} style={{ height: '82px', borderBottom: idx < emptyRows - 1 ? '1px solid var(--border)' : 'none' }}>
+                      <td colSpan={4} />
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -120,39 +140,15 @@ export default function AnomalyTable() {
 
           {/* Pagination */}
           {total > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '12px', marginTop: '12px' }}>
-              <span style={{ fontSize: '13px', color: 'var(--text-tertiary)' }}>
-                Showing {start}–{end} of {total}
-              </span>
-              <button
-                disabled={page <= 1}
-                onClick={() => setPage(page - 1)}
-                style={{
-                  border: 'none',
-                  background: 'transparent',
-                  color: page <= 1 ? 'var(--text-tertiary)' : 'var(--brand)',
-                  cursor: page <= 1 ? 'not-allowed' : 'pointer',
-                  fontSize: '13px',
-                  fontFamily: 'inherit',
-                }}
-              >
-                ← Prev
-              </button>
-              <button
-                disabled={page >= totalPages}
-                onClick={() => setPage(page + 1)}
-                style={{
-                  border: 'none',
-                  background: 'transparent',
-                  color: page >= totalPages ? 'var(--text-tertiary)' : 'var(--brand)',
-                  cursor: page >= totalPages ? 'not-allowed' : 'pointer',
-                  fontSize: '13px',
-                  fontFamily: 'inherit',
-                }}
-              >
-                Next →
-              </button>
-            </div>
+            <PaginationBar
+              start={start}
+              end={end}
+              total={total}
+              page={page}
+              totalPages={totalPages}
+              onPrev={() => setPage(page - 1)}
+              onNext={() => setPage(page + 1)}
+            />
           )}
         </>
       )}

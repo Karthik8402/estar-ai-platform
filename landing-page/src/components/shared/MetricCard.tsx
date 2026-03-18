@@ -14,6 +14,17 @@ export default function MetricCard({ value, label, suffix = '', accent }: Props)
       ? 'var(--status-error)'
       : 'var(--text-primary)';
 
+  const formatCompact = (n: number) => {
+    const abs = Math.abs(n);
+    if (abs >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1).replace(/\.0$/, '')}B`;
+    if (abs >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`;
+    if (abs >= 1_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, '')}K`;
+    return Math.round(n).toLocaleString();
+  };
+
+  const compactLabel = `${formatCompact(value)}${suffix}`;
+  const compactOnly = /[KMB]$/.test(compactLabel.replace('%', ''));
+
   return (
     <div
       style={{
@@ -29,14 +40,18 @@ export default function MetricCard({ value, label, suffix = '', accent }: Props)
     >
       <div
         className="font-mono"
+        title={`${value.toLocaleString()}${suffix}`}
         style={{
-          fontSize: '24px',
+          fontSize: 'clamp(20px, 2.2vw, 34px)',
           fontWeight: 700,
           lineHeight: 1.2,
           color: valueColor,
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
         }}
       >
-        <CountUp end={value} duration={0.8} separator="," />{suffix}
+        {compactOnly ? compactLabel : <><CountUp end={value} duration={0.8} separator="," />{suffix}</>}
       </div>
       <div
         style={{

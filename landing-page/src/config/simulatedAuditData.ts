@@ -302,7 +302,13 @@ export function getAnomalies(page: number, limit: number, severityFilter?: strin
     }
     const total = filtered.length;
     const start = (page - 1) * limit;
-    return { items: filtered.slice(start, start + limit), total, page, totalPages: Math.ceil(total / limit) };
+    return {
+        items: filtered.slice(start, start + limit),
+        total,
+        page,
+        totalPages: Math.ceil(total / limit),
+        last_check: ANOMALIES.length > 0 ? ANOMALIES[0].timestamp : null,
+    };
 }
 
 export function getIntegrity(): IntegrityReport {
