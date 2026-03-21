@@ -62,6 +62,12 @@ export interface AuditThresholds {
     off_hours_end: string;
     field_correction_limit: number;
     timestamp_tolerance: number;
+    late_pull_days_threshold?: number;
+    self_approval_enabled?: boolean | string;
+    concurrent_session_window?: number;
+    missing_reason_severity?: string;
+    oos_override_severity?: string;
+    backdated_entry_days?: number;
 }
 
 export interface ComplianceRule {

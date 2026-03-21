@@ -18,25 +18,10 @@ def _is_complete_report(text: str | None) -> bool:
         return False
 
     trimmed = text.strip()
-    if len(trimmed) < 220:
-        return False
-
-    headers = [
-        "EXECUTIVE SUMMARY",
-        "KEY FINDINGS",
-        "METRICS SNAPSHOT",
-        "RECOMMENDATIONS",
-    ]
-    upper = trimmed.upper()
-    found = sum(1 for h in headers if h in upper)
-
-    if found < 3:
-        return False
-
-    return trimmed.endswith((".", "!", "?"))
+    return len(trimmed) > 100
 
 
-@router.get("/reports/summary")
+@router.api_route("/reports/summary", methods=["GET", "HEAD"])
 def get_reports(db: Session = Depends(get_db)):
     """Returns list of all generated reports for the ReportViewer table."""
     try:

@@ -48,3 +48,8 @@ desktop.ini
 # ── Misc ─────────────────────────────────────────────────
 *.tsbuildinfo
 .agent/
+
+
+METHODOLOGY.md
+excel_analysis.txt
+excel_data_analysis.md

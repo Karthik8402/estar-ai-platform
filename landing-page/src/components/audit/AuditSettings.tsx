@@ -11,6 +11,12 @@ const THRESHOLD_META: Array<{ key: keyof AuditThresholds; label: string; suffix:
   { key: 'off_hours_end', label: 'Off-hours end', suffix: 'local' },
   { key: 'field_correction_limit', label: 'Field correction limit', suffix: 'per session' },
   { key: 'timestamp_tolerance', label: 'Timestamp tolerance', suffix: 'seconds' },
+  { key: 'late_pull_days_threshold', label: 'Late pull threshold', suffix: 'days' },
+  { key: 'self_approval_enabled', label: 'Allow self-approval', suffix: '(true/false)' },
+  { key: 'concurrent_session_window', label: 'Concurrent session window', suffix: 'minutes' },
+  { key: 'missing_reason_severity', label: 'Missing reason severity', suffix: 'level' },
+  { key: 'oos_override_severity', label: 'OOS override severity', suffix: 'level' },
+  { key: 'backdated_entry_days', label: 'Backdated entry tolerance', suffix: 'days' },
 ];
 
 export default function AuditSettings() {

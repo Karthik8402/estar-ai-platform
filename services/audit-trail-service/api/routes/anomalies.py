@@ -13,7 +13,7 @@ router = APIRouter()
 logger = logging.getLogger("audit-trail-service")
 
 
-@router.get("/reports/anomalies")
+@router.api_route("/reports/anomalies", methods=["GET", "HEAD"])
 def get_anomalies(
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=10, ge=1, le=100),

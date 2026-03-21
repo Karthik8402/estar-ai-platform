@@ -12,7 +12,7 @@ router = APIRouter()
 logger = logging.getLogger("audit-trail-service")
 
 
-@router.get("/reports/integrity")
+@router.api_route("/reports/integrity", methods=["GET", "HEAD"])
 def get_integrity(db: Session = Depends(get_db)):
     """Returns integrity check results — score, violations, and checks performed."""
     try:

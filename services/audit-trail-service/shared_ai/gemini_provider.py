@@ -45,7 +45,6 @@ class GeminiProvider(AIProvider):
             full_prompt,
             generation_config=genai.GenerationConfig(
                 temperature=temperature,
-                max_output_tokens=max_tokens,
             ),
         )
         return response.text

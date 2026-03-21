@@ -135,6 +135,74 @@ async def run_log_analyzer():
                     ))
                     new_anomalies += 1
 
+        # ── Pattern 4: Repeated Field Corrections ──
+        user_field_edits = Counter()
+        for event, action, user, time_dim in recent_events:
+            if action.action_name.startswith("field_edit_"):
+                user_field_edits[user.username] += 1
+        
+        for username, count in user_field_edits.items():
+            if count >= field_correction_limit:
+                next_evt_num += 1
+                evt_id = f"evt_auto_{next_evt_num}"
+                if evt_id not in existing_event_ids:
+                    db.add(AuditAnomaly(
+                        event_id=evt_id,
+                        timestamp=datetime.now(timezone.utc),
+                        anomaly_type="human_error",
+                        severity="warn",
+                        message=f"Repeated data corrections detected: {username} made {count} field edits in recent window (limit {field_correction_limit})",
+                        risk_score=round(35 + count * 5, 1),
+                        ai_confidence=0.85,
+                        user=username,
+                        raw_payload={"pattern": "repeated_field_correction", "count": count, "threshold": field_correction_limit},
+                    ))
+                    new_anomalies += 1
+
+        # ── Pattern 5: Missing Correction Reason ──
+        for event, action, user, time_dim in recent_events:
+            if action.action_name.startswith("field_edit_") and not event.is_compliant:
+                next_evt_num += 1
+                evt_id = f"evt_auto_{next_evt_num}"
+                if evt_id not in existing_event_ids:
+                    db.add(AuditAnomaly(
+                        event_id=evt_id,
+                        timestamp=datetime.now(timezone.utc),
+                        anomaly_type="human_error",
+                        severity=thresholds.get("missing_reason_severity", "error"),
+                        message=f"Data correction by {user.username} missing required explanatory reason",
+                        risk_score=65.5,
+                        ai_confidence=0.92,
+                        user=user.username,
+                        raw_payload={"pattern": "missing_correction_reason", "action": action.action_name},
+                    ))
+                    new_anomalies += 1
+
+        # ── Pattern 6: Self-Approval Detection ──
+        user_actions_lookup = {}
+        for event, action, user, time_dim in recent_events:
+            if user.username not in user_actions_lookup:
+                user_actions_lookup[user.username] = set()
+            user_actions_lookup[user.username].add(action.action_name)
+            
+        for username, acs in user_actions_lookup.items():
+            if ("result_entry" in acs and "result_approval" in acs) or ("study_approval_l1" in acs and "study_approval_l2" in acs):
+                next_evt_num += 1
+                evt_id = f"evt_auto_{next_evt_num}"
+                if evt_id not in existing_event_ids:
+                    db.add(AuditAnomaly(
+                        event_id=evt_id,
+                        timestamp=datetime.now(timezone.utc),
+                        anomaly_type="unauthorized",
+                        severity="critical",
+                        message=f"Self-approval detected: {username} both entered and approved data within same verification window",
+                        risk_score=95.0,
+                        ai_confidence=0.98,
+                        user=username,
+                        raw_payload={"pattern": "self_approval", "actions_seen": list(acs)},
+                    ))
+                    new_anomalies += 1
+
         # Update agent status
         agent.last_run = datetime.now(timezone.utc)
         if new_anomalies > 0:
@@ -216,11 +284,9 @@ async def run_integrity_monitor():
             .all()
         )
 
-        missing_sigs = 0
         for event, action, user in critical_actions:
             # Simulate signature validation: events with is_compliant=False are unsigned
             if not event.is_compliant:
-                missing_sigs += 1
                 # Insert a violation if not already reported
                 existing = db.query(IntegrityViolation).filter(
                     and_(
@@ -239,8 +305,10 @@ async def run_integrity_monitor():
                         timestamp=now,
                     ))
 
-        sig_passed = missing_sigs == 0
-        sig_detail = "Passed" if sig_passed else f"{missing_sigs} missing"
+        db.flush()
+        total_missing_sigs = db.query(IntegrityViolation).filter(IntegrityViolation.violation_type == "missing_signature").count()
+        sig_passed = total_missing_sigs == 0
+        sig_detail = "Passed" if sig_passed else f"{total_missing_sigs} active violations"
         _upsert_check(db, "Electronic signatures present", sig_passed, sig_detail, now)
 
         # ── Check 3: RBAC authorization validation ──
@@ -254,11 +322,6 @@ async def run_integrity_monitor():
             .filter(FactAuditEvent.created_at >= window_start_naive)
             .all()
         )
-
-        rbac_count = len(rbac_violations)
-        rbac_passed = rbac_count == 0
-        rbac_detail = "Passed" if rbac_passed else f"{rbac_count} violation(s)"
-        _upsert_check(db, "RBAC authorization validation", rbac_passed, rbac_detail, now)
 
         for event, action, user in rbac_violations:
             existing = db.query(IntegrityViolation).filter(
@@ -276,6 +339,12 @@ async def run_integrity_monitor():
                     action=action.action_name,
                     timestamp=now,
                 ))
+
+        db.flush()
+        total_rbac = db.query(IntegrityViolation).filter(IntegrityViolation.violation_type == "rbac_violation").count()
+        rbac_passed = total_rbac == 0
+        rbac_detail = "Passed" if rbac_passed else f"{total_rbac} active violations"
+        _upsert_check(db, "RBAC authorization validation", rbac_passed, rbac_detail, now)
 
         # ── Check 4: Timestamp ordering ──
         ts_warnings = 0
@@ -299,10 +368,73 @@ async def run_integrity_monitor():
         _upsert_check(db, "Timestamp ordering", ts_passed, ts_detail, now)
 
         # ── Check 5: Before/after values on corrections ──
-        _upsert_check(db, "Before/after values on corrections", True, "Passed", now)
+        missing_before_after = (
+            db.query(FactAuditEvent, DimAction, DimUser)
+            .join(DimAction, FactAuditEvent.action_id == DimAction.action_id)
+            .join(DimUser, FactAuditEvent.user_id == DimUser.user_id)
+            .filter(DimAction.action_name.ilike("field_edit_%"))
+            .filter(FactAuditEvent.is_compliant == False)
+            .filter(FactAuditEvent.created_at >= window_start_naive)
+            .all()
+        )
+        for event, action, user in missing_before_after:
+            existing = db.query(IntegrityViolation).filter(
+                and_(
+                    IntegrityViolation.violation_type == "missing_before_after",
+                    IntegrityViolation.user == user.username,
+                    IntegrityViolation.timestamp == event.created_at
+                )
+            ).first()
+            if not existing:
+                db.add(IntegrityViolation(
+                    violation_type="missing_before_after",
+                    message=f"Missing OLD/NEW values for data correction: {action.action_name} by {user.username}",
+                    severity="warn",
+                    user=user.username,
+                    action=action.action_name,
+                    timestamp=event.created_at or now,
+                ))
+
+        db.flush()
+        total_ba = db.query(IntegrityViolation).filter(IntegrityViolation.violation_type == "missing_before_after").count()
+        ba_passed = total_ba == 0
+        ba_detail = "Passed" if ba_passed else f"Failed — {total_ba} active violations"
+        _upsert_check(db, "Before/after values on corrections", ba_passed, ba_detail, now)
 
         # ── Check 6: Checksum integrity ──
-        _upsert_check(db, "Checksum integrity", True, "Passed", now)
+        orphaned_events = (
+            db.query(FactAuditEvent)
+            .filter(
+                (FactAuditEvent.timestamp_id == None) | 
+                (FactAuditEvent.user_id == None) |
+                (FactAuditEvent.action_id == None) |
+                (FactAuditEvent.module_id == None)
+            )
+            .filter(FactAuditEvent.created_at >= window_start_naive)
+            .all()
+        )
+        for event in orphaned_events:
+            existing = db.query(IntegrityViolation).filter(
+                and_(
+                    IntegrityViolation.violation_type == "orphaned_record",
+                    IntegrityViolation.timestamp == event.created_at
+                )
+            ).first()
+            if not existing:
+                db.add(IntegrityViolation(
+                    violation_type="orphaned_record",
+                    message=f"Fact Audit Event {event.event_id} missing relationship to dimension table",
+                    severity="error",
+                    user="system",
+                    action="unknown",
+                    timestamp=event.created_at or now,
+                ))
+
+        db.flush()
+        total_ref = db.query(IntegrityViolation).filter(IntegrityViolation.violation_type == "orphaned_record").count()
+        ref_passed = total_ref == 0
+        ref_detail = "Passed" if ref_passed else f"Failed — {total_ref} active violations"
+        _upsert_check(db, "Checksum integrity", ref_passed, ref_detail, now)
 
         # Update agent
         total_checks = 6
@@ -499,8 +631,8 @@ async def run_data_simulator():
         burst_user = random.choice(users)
         login_action = next((a for a in actions if a.action_name == "login_attempt"), None)
 
-        # Deterministic burst ensures Agent 1 can detect repeated failed logins.
-        if login_action:
+        # Scenario 1: Deterministic burst ensures Agent 1 can detect repeated failed logins.
+        if login_action and random.random() < 0.3:
             for _ in range(4):
                 burst_time = now
                 burst_dim = _get_or_create_time_dim(db, burst_time)
@@ -519,16 +651,38 @@ async def run_data_simulator():
         for _ in range(batch_size):
             event_time = now
             time_dim = _get_or_create_time_dim(db, event_time)
-            action = random.choice(actions)
             user = random.choice(users)
             module = random.choice(modules)
             session = random.choice(sessions)
-
-            risk_score = round(random.uniform(10, 95), 2)
-            is_compliant = random.random() > 0.08
-
-            if action.action_name == "login_attempt" and random.random() < 0.4:
-                is_compliant = False
+            
+            scenario_roll = random.random()
+            
+            # Scenario 2: Repeated field correction events (40% probability)
+            if scenario_roll < 0.40:
+                action = random.choice([a for a in actions if a.action_name.startswith("field_edit_")] or actions)
+                is_compliant = random.random() > 0.2
+                risk_score = round(random.uniform(30, 85), 2)
+            
+            # Scenario 3: Missing e-signature on approval (25% probability)
+            elif scenario_roll < 0.65:
+                action = random.choice([a for a in actions if "approval" in a.action_name] or actions)
+                is_compliant = False  # Simulate missing signature
+                risk_score = round(random.uniform(70, 95), 2)
+                
+            # Scenario 4: Off-hours critical activity (20% probability)
+            elif scenario_roll < 0.85:
+                action = random.choice([a for a in actions if a.action_category == "critical"] or actions)
+                is_compliant = random.random() > 0.1
+                risk_score = round(random.uniform(50, 90), 2)
+                # Force off-hours time dimension
+                off_hours_time = datetime.utcnow().replace(hour=random.choice([1, 2, 3, 23]))
+                time_dim = _get_or_create_time_dim(db, off_hours_time)
+                
+            # Generic valid events for background noise
+            else:
+                action = random.choice(actions)
+                is_compliant = True
+                risk_score = round(random.uniform(0, 30), 2)
 
             db.add(FactAuditEvent(
                 timestamp_id=time_dim.time_id,

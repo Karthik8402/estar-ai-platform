@@ -2,6 +2,7 @@
 
 import uuid
 import random
+import os
 from datetime import datetime, timedelta
 
 from db.database import engine, SessionLocal
@@ -35,12 +36,21 @@ def seed():
 
         # ─── Dimension: Users ─────────────────────────
         users_data = [
+            # Existing demo users
             ("jdoe", "jdoe@enviroapps.com", "analyst"),
             ("analyst3", "analyst3@enviroapps.com", "analyst"),
             ("supervisor1", "supervisor1@enviroapps.com", "supervisor"),
             ("operator_k", "karthik@enviroapps.com", "operator"),
             ("lab_tech_m", "maria@enviroapps.com", "lab_tech"),
             ("admin_r", "admin@enviroapps.com", "admin"),
+            # New real users from Excel study_120027
+            ("MSMITH", "msmith@mckesson.com", "analyst"),
+            ("ANGELA", "angela@mckesson.com", "supervisor"),
+            ("BRYAN", "bryan@mckesson.com", "supervisor"),
+            ("A_Crowell", "acrowell@mckesson.com", "analyst"),
+            ("J_Myers", "jmyers@mckesson.com", "lab_tech"),
+            ("C_Picerno", "cpicerno@mckesson.com", "analyst"),
+            ("EAPHARMICS", "system@eapharmics.com", "admin"),
         ]
         role_map = {r.role_name: r.role_id for r in roles}
         users = []
@@ -66,18 +76,37 @@ def seed():
             DimModule(module_name="data-entry", compliance_category_id=compliances[0].compliance_id),
             DimModule(module_name="stability-report", compliance_category_id=compliances[1].compliance_id),
             DimModule(module_name="oot-alerting", compliance_category_id=compliances[2].compliance_id),
+            DimModule(module_name="study-management", compliance_category_id=compliances[0].compliance_id),
+            DimModule(module_name="sample-management", compliance_category_id=compliances[1].compliance_id),
+            DimModule(module_name="label-management", compliance_category_id=compliances[3].compliance_id),
+            DimModule(module_name="graph-generator", compliance_category_id=compliances[2].compliance_id),
         ]
         db.add_all(modules)
         db.flush()
 
         # ─── Dimension: Actions ────────────────────────
         actions = [
+            # Existing demo actions
             DimAction(action_name="login_attempt", action_category="auth", requires_e_signature=False),
             DimAction(action_name="data_correction", action_category="data", requires_e_signature=False),
             DimAction(action_name="batch_release", action_category="critical", requires_e_signature=True),
             DimAction(action_name="admin_config", action_category="admin", requires_e_signature=True),
             DimAction(action_name="report_approval", action_category="review", requires_e_signature=True),
             DimAction(action_name="record_deletion", action_category="data", requires_e_signature=True),
+            # New real actions from Excel operations
+            DimAction(action_name="field_edit_expiry", action_category="data", requires_e_signature=False),
+            DimAction(action_name="field_edit_lot_number", action_category="data", requires_e_signature=False),
+            DimAction(action_name="field_edit_schedule_status", action_category="critical", requires_e_signature=True),
+            DimAction(action_name="field_edit_result", action_category="data", requires_e_signature=True),
+            DimAction(action_name="field_edit_study_status", action_category="critical", requires_e_signature=True),
+            DimAction(action_name="sample_pull", action_category="critical", requires_e_signature=True),
+            DimAction(action_name="test_start", action_category="data", requires_e_signature=False),
+            DimAction(action_name="test_end", action_category="data", requires_e_signature=False),
+            DimAction(action_name="interval_approval", action_category="critical", requires_e_signature=True),
+            DimAction(action_name="study_approval_l1", action_category="critical", requires_e_signature=True),
+            DimAction(action_name="study_approval_l2", action_category="critical", requires_e_signature=True),
+            DimAction(action_name="result_entry", action_category="data", requires_e_signature=False),
+            DimAction(action_name="result_approval", action_category="critical", requires_e_signature=True),
         ]
         db.add_all(actions)
         db.flush()
@@ -112,75 +141,203 @@ def seed():
         db.flush()
 
         # ─── Fact: Audit Events ────────────────────────
-        for i in range(50):
+        total_events = 200
+        print(f"Seeding {total_events} realistic pharmaceutical audit events (mixed compliance)...")
+        
+        # Keep track of events to simulate relations
+        all_events = []
+        # We will generate 150+ events mixing existing random patterns + new pharma patterns
+        
+        # 1. Base events (random mix) - 70 events
+        for i in range(70):
+            action = actions[i % len(actions)]
+            is_compliant = True # Default to compliant
+            
+            # Inject realistic anomalies for mixed-compliance dataset
+            # SCENARIO 1: Missing Correction Reason (3% chance on field edits)
+            if "field_edit_" in action.action_name and random.random() < 0.03:
+                is_compliant = False
+            
+            # SCENARIO 8: Missing e-signature on critical approval (2% chance)
+            if action.requires_e_signature and random.random() < 0.02:
+                is_compliant = False
+            
+            # Calculate risk score based on compliance
+            if is_compliant:
+                risk_score = round(random.uniform(5, 30), 2)
+            else:
+                risk_score = round(random.uniform(50, 95), 2)
+
             evt = FactAuditEvent(
                 timestamp_id=time_dims[i % len(time_dims)].time_id,
                 user_id=users[i % len(users)].user_id,
-                action_id=actions[i % len(actions)].action_id,
+                action_id=action.action_id,
                 module_id=modules[i % len(modules)].module_id,
                 session_id=sessions[i % len(sessions)].session_id,
-                risk_score=round(random.uniform(0, 85), 2),
-                is_compliant=random.random() > 0.06,
+                risk_score=risk_score,
+                is_compliant=is_compliant,
             )
             db.add(evt)
+            all_events.append(evt) # Store for potential relations
+            
+        # 2. Add realistic study_120027 schedule pull events - 30 events
+        msmith = next(u for u in users if u.username == "MSMITH")
+        angela = next(u for u in users if u.username == "ANGELA")
+        sample_pull_act = next(a for a in actions if a.action_name == "sample_pull")
+        study_mod = next(m for m in modules if m.module_name == "study-management")
+        
+        for i in range(30):
+            is_comp = random.random() > 0.1  # 10% non-compliance rate
+            evt = FactAuditEvent(
+                timestamp_id=time_dims[(70 + i) % len(time_dims)].time_id,
+                user_id=msmith.user_id if i % 3 != 0 else angela.user_id,
+                action_id=sample_pull_act.action_id,
+                module_id=study_mod.module_id,
+                session_id=sessions[i % len(sessions)].session_id,
+                risk_score=round(random.uniform(10, 45), 2) if is_comp else random.uniform(50, 75),
+                is_compliant=is_comp,
+            )
+            db.add(evt)
+            
+        # 3. Add realistic test result events - 30 events
+        acrowell = next(u for u in users if u.username == "A_Crowell")
+        jmyers = next(u for u in users if u.username == "J_Myers")
+        result_entry_act = next(a for a in actions if a.action_name == "result_entry")
+        result_approval_act = next(a for a in actions if a.action_name == "result_approval")
+        report_mod = next(m for m in modules if m.module_name == "stability-report")
+        
+        for i in range(30):
+            is_appr = i % 4 == 0
+            act = result_approval_act if is_appr else result_entry_act
+            is_comp = random.random() > (0.2 if is_appr else 0.05)
+            evt = FactAuditEvent(
+                timestamp_id=time_dims[(100 + i) % len(time_dims)].time_id,
+                user_id=acrowell.user_id if i % 2 == 0 else jmyers.user_id,
+                action_id=act.action_id,
+                module_id=report_mod.module_id,
+                session_id=sessions[i % len(sessions)].session_id,
+                risk_score=round(random.uniform(20, 95) if not is_comp else random.uniform(5, 30), 2),
+                is_compliant=is_comp,
+            )
+            db.add(evt)
+            
+        # 4. Add data correction events (edit log) - 25 events
+        field_edit_res = next(a for a in actions if a.action_name == "field_edit_result")
+        field_edit_exp = next(a for a in actions if a.action_name == "field_edit_expiry")
+        data_mod = next(m for m in modules if m.module_name == "data-entry")
+        
+        for i in range(25):
+            is_res = i % 2 == 0
+            is_comp = random.random() > 0.3  # 30% failure rate reflects real pharma correction patterns
+            evt = FactAuditEvent(
+                timestamp_id=time_dims[(130 + i) % len(time_dims)].time_id,
+                user_id=users[(i * 3) % len(users)].user_id,
+                action_id=field_edit_res.action_id if is_res else field_edit_exp.action_id,
+                module_id=data_mod.module_id,
+                session_id=sessions[i % len(sessions)].session_id,
+                risk_score=round(random.uniform(50, 85) if not is_comp else random.uniform(10, 40), 2),
+                is_compliant=is_comp,
+            )
+            db.add(evt)
+            
         db.flush()
 
-        # ─── Anomalies (47 unique items) ──────────────────────────
+        # ─── Anomalies (60+ items including real pharma patterns) ──────────────────────────
         anomaly_data = [
             # CRITICAL anomalies
-            ("critical", "unauthorized", "Same field edited 4 times in one session by user jdoe — potential data manipulation", "jdoe", 92.1),
-            ("critical", "integrity_fail", "Missing electronic signature on batch release #312 — 21 CFR Part 11.10(b) violation", "jdoe", 95.3),
-            ("critical", "unauthorized", "Bulk deletion of 23 stability records in under 15 seconds — possible data destruction", "operator_k", 91.7),
-            ("critical", "unauthorized", "Admin credentials used from unregistered device at 03:42 local time", "admin_r", 88.4),
-            ("critical", "integrity_fail", "Checksum mismatch on audit trail block #7841 — potential log tampering detected", "system", 97.0),
-            # ERROR anomalies
-            ("error", "human_error", "Repeated failed logins (4 attempts) followed by successful login and immediate data correction on record #4521", "jdoe", 78.2),
-            ("error", "integrity_fail", "Role mismatch: analyst3 attempted admin-level configuration change without RBAC authorization", "analyst3", 82.5),
-            ("error", "unauthorized", "Off-hours modification at 02:14 local time — batch release #312 approved without supervisor", "operator_k", 75.9),
-            ("error", "human_error", "Data correction without required electronic signature on stability test result #8812", "jdoe", 71.3),
-            ("error", "unauthorized", "Failed login attempts from new IP address range 192.168.5.x — possible brute force", "unknown", 80.1),
-            ("error", "integrity_fail", "Electronic signature mismatch on batch release document #445 — signer ID does not match session user", "supervisor1", 85.6),
-            ("error", "unauthorized", "Unauthorized access attempt to compliance configuration panel from lab workstation", "lab_tech_m", 73.8),
-            ("error", "human_error", "Stability test pH value changed from 6.8 to 7.2 without documented justification", "analyst3", 69.4),
-            ("error", "integrity_fail", "Timestamp gap of 47 seconds between sequential events #4480 and #4481", "system", 67.2),
-            ("error", "unauthorized", "User operator_k accessed restricted module 'admin-config' outside authorized role scope", "operator_k", 76.5),
-            # WARN anomalies
-            ("warn", "human_error", "Bulk deletion of 14 records in under 30 seconds — review recommended", "analyst3", 55.3),
-            ("warn", "human_error", "Multiple password resets within 10 minutes for user jdoe — possible credential sharing", "jdoe", 48.7),
-            ("warn", "integrity_fail", "Audit log entry missing before/after values on record #3392 correction", "lab_tech_m", 52.1),
-            ("warn", "unauthorized", "Access from unregistered device during restricted hours (Saturday 22:15)", "operator_k", 58.9),
-            ("warn", "human_error", "Repeated validation overrides on pH measurements for batch #556 — 3 overrides in 1 hour", "analyst3", 61.2),
-            ("warn", "human_error", "Critical action performed without supervisor approval — sample disposal #221", "lab_tech_m", 54.6),
-            ("warn", "integrity_fail", "Sequential event numbering gap: events #5102 to #5104 (event #5103 missing)", "system", 45.3),
-            ("warn", "unauthorized", "Login from geographic location inconsistent with user profile — US-West vs registered US-East", "jdoe", 50.8),
-            ("warn", "human_error", "Dissolution test result manually overridden without QA counter-signature", "analyst3", 57.4),
-            ("warn", "integrity_fail", "Session duration exceeded 12-hour policy limit — session active for 14h 23m", "operator_k", 43.2),
-            ("warn", "human_error", "Duplicate data entry detected: same stability result entered twice within 5 minutes", "lab_tech_m", 39.8),
-            ("warn", "unauthorized", "API key used from unauthorized service endpoint — internal microservice misconfiguration", "system", 62.1),
-            ("warn", "human_error", "Temperature excursion data point manually deleted and re-entered with different value", "jdoe", 66.5),
-            ("warn", "integrity_fail", "Digital certificate for e-signature nearing expiration (7 days remaining) for user supervisor1", "supervisor1", 38.4),
-            ("warn", "human_error", "Assay result changed from 98.2% to 99.1% — outside acceptable correction tolerance of ±0.5%", "analyst3", 64.7),
-            ("warn", "unauthorized", "Concurrent sessions detected: user jdoe logged in from 2 different IP addresses simultaneously", "jdoe", 53.2),
-            ("warn", "human_error", "Impurity test result deleted and re-analyzed without opening a deviation report", "lab_tech_m", 59.3),
-            ("warn", "integrity_fail", "Backup verification failed: audit trail backup hash does not match primary database", "system", 70.1),
-            ("warn", "human_error", "Stability chamber temperature reading manually adjusted in LIMS without instrument log correlation", "operator_k", 47.6),
-            ("warn", "unauthorized", "User admin_r account accessed after 90 days of inactivity — dormant account policy violation", "admin_r", 44.9),
-            ("warn", "human_error", "Water activity measurement rejected 3 times before acceptance on batch #789", "analyst3", 41.5),
-            ("warn", "integrity_fail", "Time synchronization drift detected: server clock 3.2 seconds ahead of NTP reference", "system", 36.7),
-            ("warn", "human_error", "Cleaning validation record modified after final approval — requires investigation", "supervisor1", 63.8),
-            ("warn", "unauthorized", "VPN connection from blacklisted IP range used to access audit portal", "unknown", 71.4),
-            ("warn", "human_error", "Raw material CoA manually entered instead of imported from supplier system", "lab_tech_m", 35.2),
-            ("warn", "integrity_fail", "Database index rebuild triggered unexpectedly during peak operational hours", "system", 33.1),
-            ("warn", "human_error", "Particle count test manually failed and retested 4 times on same sample vial", "analyst3", 56.8),
-            ("warn", "unauthorized", "PrintScreen key detected during classified document viewing session", "operator_k", 42.3),
-            ("warn", "human_error", "Environmental monitoring data point flagged as out-of-trend but not escalated", "lab_tech_m", 37.9),
-            ("warn", "integrity_fail", "Orphaned database record: fact_audit_event #9923 has no linked dim_time entry", "system", 31.5),
-            ("warn", "human_error", "Weighing result transcription error: 150.2mg entered as 152.0mg on batch record #1102", "analyst3", 60.4),
-            ("warn", "unauthorized", "Service account 'etl_pipeline' executed manual query against production audit tables", "system", 46.2),
-        ]
+            ("critical", "unauthorized", "Same field edited 4 times in one session by user jdoe — potential data manipulation", "jdoe", 92.1, {"pattern": "repeated_field_correction"}),
+            ("critical", "integrity_fail", "Missing electronic signature on batch release #312 — 21 CFR Part 11.10(b) violation", "jdoe", 95.3, {"pattern": "missing_approval_signature"}),
+            ("critical", "unauthorized", "Bulk deletion of 23 stability records in under 15 seconds — possible data destruction", "operator_k", 91.7, {"pattern": "bulk_record_deletion"}),
+            ("critical", "unauthorized", "Admin credentials used from unregistered device at 03:42 local time", "admin_r", 88.4, {"pattern": "off_hours_data_modification"}),
+            ("critical", "integrity_fail", "Checksum mismatch on audit trail block #7841 — potential log tampering detected", "system", 97.0, {"pattern": "checksum_mismatch"}),
+            ("critical", "human_error", "Test result changed from failing (94.2) to passing (98.7) without deviation report", "A_Crowell", 94.5, {"pattern": "oos_result_override", "old_result": "94.2", "new_result": "98.7"}),
+            ("critical", "unauthorized", "Self-approval detected: ANGELA both entered and approved data for study 120027", "ANGELA", 91.2, {"pattern": "self_approval", "study": "120027"}),
+            ("critical", "human_error", "Test result changed from failing to passing without deviation report", "MSMITH", 93.8, {"pattern": "oos_result_override"}),
+            ("critical", "unauthorized", "Self-approval detected: BRYAN both entered and approved data for study 120028", "BRYAN", 90.5, {"pattern": "self_approval", "study": "120028"}),
 
-        for i, (sev, atype, msg, user, risk) in enumerate(anomaly_data):
+            # ERROR anomalies
+            ("error", "human_error", "Repeated failed logins (4 attempts) followed by successful login and immediate data correction on record #4521", "jdoe", 78.2, {"pattern": "failed_login_cluster"}),
+            ("error", "integrity_fail", "Role mismatch: analyst3 attempted admin-level configuration change without RBAC authorization", "analyst3", 82.5, {"pattern": "rbac_role_mismatch"}),
+            ("error", "unauthorized", "Off-hours modification at 02:14 local time — batch release #312 approved without supervisor", "operator_k", 75.9, {"pattern": "off_hours_data_modification"}),
+            ("error", "human_error", "Data correction without required electronic signature on stability test result #8812", "jdoe", 71.3, {"pattern": "missing_approval_signature"}),
+            ("error", "unauthorized", "Failed login attempts from new IP address range 192.168.5.x — possible brute force", "unknown", 80.1, {"pattern": "failed_login_cluster"}),
+            ("error", "integrity_fail", "Electronic signature mismatch on batch release document #445 — signer ID does not match session user", "supervisor1", 85.6, {"pattern": "signature_mismatch"}),
+            ("error", "unauthorized", "Unauthorized access attempt to compliance configuration panel from lab workstation", "lab_tech_m", 73.8, {"pattern": "rbac_role_mismatch"}),
+            ("error", "human_error", "Stability test pH value changed from 6.8 to 7.2 without documented justification", "analyst3", 69.4, {"pattern": "missing_correction_reason"}),
+            ("error", "integrity_fail", "Timestamp gap of 47 seconds between sequential events #4480 and #4481", "system", 67.2, {"pattern": "timestamp_gap"}),
+            ("error", "unauthorized", "User operator_k accessed restricted module 'admin-config' outside authorized role scope", "operator_k", 76.5, {"pattern": "rbac_role_mismatch"}),
+            ("error", "human_error", "Multiple schedule statuses changed from PENDING to COMPLETED in rapid succession", "EAPHARMICS", 75.0, {"pattern": "bulk_status_change"}),
+            ("error", "integrity_fail", "Lab technician changed study configuration (admin action)", "J_Myers", 81.0, {"pattern": "rbac_role_mismatch"}),
+            ("error", "human_error", "Same user edits the same field >3 times on the same record", "MSMITH", 72.5, {"pattern": "repeated_field_correction"}),
+            ("error", "integrity_fail", "Schedule marked APPROVED but APPROVAL_LEVEL1_YN = 'N'", "ANGELA", 84.2, {"pattern": "missing_approval_signature"}),
+            ("error", "human_error", "Multiple schedule statuses changed from PENDING to COMPLETED in rapid succession", "EAPHARMICS", 73.5, {"pattern": "bulk_status_change"}),
+            ("error", "human_error", "Same user edits the same field >3 times on the same record", "C_Picerno", 70.8, {"pattern": "repeated_field_correction"}),
+
+            # WARN anomalies
+            ("warn", "human_error", "Bulk deletion of 14 records in under 30 seconds — review recommended", "analyst3", 55.3, {"pattern": "bulk_record_deletion"}),
+            ("warn", "human_error", "Multiple password resets within 10 minutes for user jdoe — possible credential sharing", "jdoe", 48.7, {"pattern": "auth_anomaly"}),
+            ("warn", "integrity_fail", "Audit log entry missing before/after values on record #3392 correction", "lab_tech_m", 52.1, {"pattern": "missing_before_value"}),
+            ("warn", "unauthorized", "Access from unregistered device during restricted hours (Saturday 22:15)", "operator_k", 58.9, {"pattern": "off_hours_data_modification"}),
+            ("warn", "human_error", "Repeated validation overrides on pH measurements for batch #556 — 3 overrides in 1 hour", "analyst3", 61.2, {"pattern": "repeated_field_correction"}),
+            ("warn", "human_error", "Critical action performed without supervisor approval — sample disposal #221", "lab_tech_m", 54.6, {"pattern": "missing_approval_signature"}),
+            ("warn", "integrity_fail", "Sequential event numbering gap: events #5102 to #5104 (event #5103 missing)", "system", 45.3, {"pattern": "sequential_gap"}),
+            ("warn", "unauthorized", "Login from geographic location inconsistent with user profile — US-West vs registered US-East", "jdoe", 50.8, {"pattern": "geo_anomaly"}),
+            ("warn", "human_error", "Dissolution test result manually overridden without QA counter-signature", "analyst3", 57.4, {"pattern": "missing_approval_signature"}),
+            ("warn", "integrity_fail", "Session duration exceeded 12-hour policy limit — session active for 14h 23m", "operator_k", 43.2, {"pattern": "session_anomaly"}),
+            ("warn", "human_error", "Duplicate data entry detected: same stability result entered twice within 5 minutes", "lab_tech_m", 39.8, {"pattern": "duplicate_test_result"}),
+            ("warn", "unauthorized", "API key used from unauthorized service endpoint — internal microservice misconfiguration", "system", 62.1, {"pattern": "api_anomaly"}),
+            ("warn", "human_error", "Temperature excursion data point manually deleted and re-entered with different value", "jdoe", 66.5, {"pattern": "missing_correction_reason"}),
+            ("warn", "integrity_fail", "Digital certificate for e-signature nearing expiration (7 days remaining)", "supervisor1", 38.4, {"pattern": "cert_expiry"}),
+            ("warn", "human_error", "Assay result changed from 98.2% to 99.1% — outside acceptable correction tolerance", "analyst3", 64.7, {"pattern": "margin_anomaly"}),
+            ("warn", "unauthorized", "Concurrent sessions detected: user jdoe logged in from 2 different IPs simultaneously", "jdoe", 53.2, {"pattern": "concurrent_sessions"}),
+            ("warn", "human_error", "Impurity test result deleted and re-analyzed without opening a deviation report", "lab_tech_m", 59.3, {"pattern": "missing_correction_reason"}),
+            ("warn", "integrity_fail", "Backup verification failed: audit trail backup hash does not match primary", "system", 70.1, {"pattern": "backup_anomaly"}),
+            ("warn", "human_error", "Stability chamber temperature reading manually adjusted in LIMS without instrument log", "operator_k", 47.6, {"pattern": "missing_correction_reason"}),
+            ("warn", "unauthorized", "User admin_r account accessed after 90 days of inactivity — dormant account policy violation", "admin_r", 44.9, {"pattern": "dormant_account"}),
+            ("warn", "human_error", "Water activity measurement rejected 3 times before acceptance on batch #789", "analyst3", 41.5, {"pattern": "repeated_field_correction"}),
+            ("warn", "integrity_fail", "Time synchronization drift detected: server clock 3.2 seconds ahead of NTP reference", "system", 36.7, {"pattern": "time_drift"}),
+            ("warn", "human_error", "Cleaning validation record modified after final approval — requires investigation", "supervisor1", 63.8, {"pattern": "post_approval_edit"}),
+            ("warn", "unauthorized", "VPN connection from blacklisted IP range used to access audit portal", "unknown", 71.4, {"pattern": "ip_blacklist"}),
+            ("warn", "human_error", "Raw material CoA manually entered instead of imported from supplier system", "lab_tech_m", 35.2, {"pattern": "manual_entry_anomaly"}),
+            ("warn", "integrity_fail", "Database index rebuild triggered unexpectedly during peak operational hours", "system", 33.1, {"pattern": "admin_anomaly"}),
+            ("warn", "human_error", "Particle count test manually failed and retested 4 times on same sample vial", "analyst3", 56.8, {"pattern": "repeated_field_correction"}),
+            ("warn", "unauthorized", "PrintScreen key detected during classified document viewing session", "operator_k", 42.3, {"pattern": "dlp_anomaly"}),
+            ("warn", "human_error", "Environmental monitoring data point flagged as out-of-trend but not escalated", "lab_tech_m", 37.9, {"pattern": "escalation_failure"}),
+            ("warn", "integrity_fail", "Orphaned database record: fact_audit_event #9923 has no linked dim_time entry", "system", 31.5, {"pattern": "orphaned_record"}),
+            ("warn", "human_error", "Weighing result transcription error: 150.2mg entered as 152.0mg on batch record #1102", "analyst3", 60.4, {"pattern": "transcription_error"}),
+            ("warn", "unauthorized", "Service account 'etl_pipeline' executed manual query against production audit tables", "system", 46.2, {"pattern": "service_account_anomaly"}),
+            # Real Pharma Excel Warn Scenarios
+            ("warn", "human_error", "Stability sample pulled >30 days after scheduled pull date (46 days late)", "MSMITH", 53.0, {"pattern": "late_sample_pull", "days_late": 46}),
+            ("warn", "human_error", "Stability sample pulled >30 days after scheduled pull date (32 days late)", "ANGELA", 46.0, {"pattern": "late_sample_pull", "days_late": 32}),
+            ("warn", "integrity_fail", "Edit log entry has NEW_VALUE but OLD_VALUE is NULL", "MSMITH", 52.5, {"pattern": "missing_before_value"}),
+            ("warn", "integrity_fail", "Edit log entry has NEW_VALUE but OLD_VALUE is NULL", "A_Crowell", 51.0, {"pattern": "missing_before_value"}),
+            ("warn", "integrity_fail", "Edit log entry has NEW_VALUE but OLD_VALUE is NULL", "J_Myers", 54.2, {"pattern": "missing_before_value"}),
+            ("warn", "human_error", "Data correction without documented reason (REASON is NULL)", "C_Picerno", 65.0, {"pattern": "missing_correction_reason"}),
+            ("warn", "human_error", "Data correction without documented reason (REASON is NULL)", "J_Myers", 62.5, {"pattern": "missing_correction_reason"}),
+            ("warn", "unauthorized", "Different user completing another's pull without handoff", "MSMITH", 48.0, {"pattern": "user_handoff_gap"}),
+            ("warn", "unauthorized", "Different user completing another's pull without handoff", "A_Crowell", 49.5, {"pattern": "user_handoff_gap"}),
+            ("warn", "unauthorized", "Concurrent sessions detected: user MSMITH logged in from 2 different IPs within 5 minutes", "MSMITH", 55.0, {"pattern": "concurrent_sessions"}),
+            ("warn", "unauthorized", "Concurrent sessions detected: user ANGELA logged in from 2 different IPs within 5 minutes", "ANGELA", 54.5, {"pattern": "concurrent_sessions"}),
+            ("warn", "integrity_fail", "Record INSERT_DATE is AFTER the ACTIVITY_DATE (Backdated entry)", "EAPHARMICS", 61.0, {"pattern": "backdated_entry"}),
+            ("warn", "integrity_fail", "Record INSERT_DATE is AFTER the ACTIVITY_DATE (Backdated entry)", "MSMITH", 60.0, {"pattern": "backdated_entry"}),
+            ("warn", "human_error", "Same test result entered twice for same schedule/product", "A_Crowell", 45.0, {"pattern": "duplicate_test_result"}),
+            ("warn", "human_error", "Same test result entered twice for same schedule/product", "J_Myers", 44.5, {"pattern": "duplicate_test_result"}),
+            ("warn", "integrity_fail", "Orphaned Test Result (No Linked Schedule)", "C_Picerno", 40.0, {"pattern": "orphaned_record"}),
+            ("warn", "integrity_fail", "Edit log entry has NEW_VALUE but OLD_VALUE is NULL", "EAPHARMICS", 50.0, {"pattern": "missing_before_value"}),
+        ]
+        
+        for i, (sev, atype, msg, user, risk, payload) in enumerate(anomaly_data):
             mins = i * 12 + random.randint(0, 9)
+            
+            # Use the provided payload or fallback to generic if not provided
+            full_payload = {
+                "action": atype,
+                "record_id": 4000 + i,
+                "module": ["data-entry", "audit-trail", "stability-report", "oot-alerting"][i % 4],
+            }
+            if payload:
+                full_payload.update(payload)
+                
             anom = AuditAnomaly(
                 event_id=f"evt_{str(i+1).zfill(3)}",
                 timestamp=now - timedelta(minutes=mins),
@@ -192,26 +349,24 @@ def seed():
                 user=user if user != "system" else None,
                 session_id=f"ses_{uuid.uuid4().hex[:8]}",
                 ip_address=f"10.0.{random.randint(0,4)}.{random.randint(1,254)}",
-                raw_payload={
-                    "action": atype,
-                    "record_id": 4000 + i,
-                    "module": ["data-entry", "audit-trail", "stability-report", "oot-alerting"][i % 4],
-                },
+                raw_payload=full_payload,
             )
             db.add(anom)
         db.flush()
 
         # ─── Integrity ─────────────────────────────────
+        integrity_checks = []
+        violations = []
         integrity_checks = [
             IntegrityCheck(check_name="Sequential event numbering", passed=True, detail="Passed"),
             IntegrityCheck(check_name="Timestamp ordering", passed=True, detail="Passed (3 warnings)"),
-            IntegrityCheck(check_name="Electronic signatures present", passed=False, detail="1 missing"),
+            IntegrityCheck(check_name="Electronic signatures present", passed=False, detail="2 missing"),
             IntegrityCheck(check_name="RBAC authorization validation", passed=False, detail="1 violation"),
-            IntegrityCheck(check_name="Before/after values on corrections", passed=True, detail="Passed"),
+            IntegrityCheck(check_name="Before/after values on corrections", passed=False, detail="4 corrections missing old/new values"),
             IntegrityCheck(check_name="Checksum integrity", passed=True, detail="Passed"),
         ]
         db.add_all(integrity_checks)
-
+        
         violations = [
             IntegrityViolation(
                 violation_type="missing_signature",
@@ -236,7 +391,7 @@ def seed():
         ]
         db.add_all(violations)
         db.flush()
-
+        
         # ─── Reports — computed from actual seeded data ───────
         # Count the seeded anomalies by severity and type
         all_seeded_anomalies = db.query(AuditAnomaly).all()
@@ -289,7 +444,7 @@ RECOMMENDATIONS
 • IMMEDIATE: Resolve {len([v for v in all_viols if v.violation_type == 'missing_signature'])} missing electronic signature violations — retroactive signature collection required
 • SHORT-TERM: Audit RBAC role assignments for users flagged in unauthorized access events
 • SHORT-TERM: Implement additional authentication controls for off-hours critical actions
-• LONG-TERM: Automate anomaly pattern detection thresholds based on rolling 30-day baseline"""
+• LONG-TERM: Automate anomaly pattern detection thresholds based on rolling 30-day baseline."""
 
         weekly_text = f"""OFFICIAL WEEKLY AUDIT REPORT — eSTAR AI Platform
 Report Date: {(now - timedelta(days=7)).strftime('%B %d, %Y at %H:%M UTC')}
@@ -321,7 +476,7 @@ RECOMMENDATIONS
 
 • SHORT-TERM: Implement mandatory re-training for users with >3 human error anomalies flagged
 • SHORT-TERM: Review and tighten off-hours access window policy from 22:00–06:00
-• LONG-TERM: Consider automated lockout for accounts exceeding unauthorized access threshold within 24 hours"""
+• LONG-TERM: Consider automated lockout for accounts exceeding unauthorized access threshold within 24 hours."""
 
         ondemand_text = f"""ON-DEMAND AUDIT REPORT — eSTAR AI Platform
 Report Date: {(now - timedelta(days=9)).strftime('%B %d, %Y at %H:%M UTC')}
@@ -350,9 +505,9 @@ RESOLUTION STATUS
 
 RECOMMENDATIONS
 
-• IMMEDIATE: Initiate formal CAPA for {critical_count} critical anomalies
-• SHORT-TERM: Update electronic signature enforcement to prevent non-compliant submissions
-• LONG-TERM: Schedule bi-annual RBAC access review for all system users"""
+• IMMEDIATE: Initiate formal CAPA for {critical_count} critical anomalies.
+• SHORT-TERM: Update electronic signature enforcement to prevent non-compliant submissions.
+• LONG-TERM: Schedule bi-annual RBAC access review for all system users."""
 
         reports = [
             AuditReport(report_id="rpt_001", report_type="daily",
@@ -400,6 +555,13 @@ RECOMMENDATIONS
             AuditThreshold(key="off_hours_end", value="06:00", description="Off-hours window end"),
             AuditThreshold(key="field_correction_limit", value="3", description="Max corrections per session"),
             AuditThreshold(key="timestamp_tolerance", value="2", description="Seconds tolerance for timestamp gaps"),
+            # New pharma thresholds
+            AuditThreshold(key="late_pull_days_threshold", value="30", description="Max days late for sample pull"),
+            AuditThreshold(key="self_approval_enabled", value="false", description="Allow user to approve own data"),
+            AuditThreshold(key="concurrent_session_window", value="5", description="Minutes window for concurrent session IPs"),
+            AuditThreshold(key="missing_reason_severity", value="error", description="Severity for missing correction reason"),
+            AuditThreshold(key="oos_override_severity", value="critical", description="Severity for OOS result override without deviation"),
+            AuditThreshold(key="backdated_entry_days", value="0", description="Tolerance in days for backdated entries"),
         ]
         db.add_all(thresholds)
 
@@ -414,10 +576,10 @@ RECOMMENDATIONS
 
         db.commit()
         print("✅ Seed data inserted successfully!")
-        print(f"   • {len(users)} users, {len(roles)} roles")
-        print(f"   • 47 anomalies, 3 violations, 6 integrity checks")
-        print(f"   • 3 reports, 3 agents, 6 thresholds, 4 compliance rules")
-        print(f"   • 50 fact audit events across dimensions")
+        print(f"   • {len(users)} users, {len(actions)} actions, {len(modules)} modules")
+        print(f"   • {len(anomaly_data)} anomalies, {len(violations)} violations, {len(integrity_checks)} integrity checks")
+        print(f"   • {len(reports)} reports, {len(agents)} agents, {len(thresholds)} thresholds")
+        print(f"   • 155 fact audit events mapped across dimensions")
 
     except Exception as e:
         db.rollback()
