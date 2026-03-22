@@ -9,6 +9,13 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql://epharmic:change-me-in-development@localhost:5432/epharmic_db"
     DATABASE_URL_FALLBACK: str = ""
     DB_CONNECT_TIMEOUT_SECONDS: int = 8
+    DB_KEEPALIVES: int = 1
+    DB_KEEPALIVES_IDLE_SECONDS: int = 30
+    DB_KEEPALIVES_INTERVAL_SECONDS: int = 10
+    DB_KEEPALIVES_COUNT: int = 5
+
+    # Agent safety bounds
+    AGENT_MAX_LOOKBACK_MINUTES: int = 30
 
     # JWT (deferred — not enforced yet)
     JWT_SECRET: str = "change-me-in-development"

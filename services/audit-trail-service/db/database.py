@@ -54,11 +54,27 @@ def _resolve_database_url() -> str:
 
 
 resolved_database_url = _resolve_database_url()
-connect_args = {"connect_timeout": settings.DB_CONNECT_TIMEOUT_SECONDS} if resolved_database_url.startswith("postgresql") else {}
+
+
+def _build_connect_args(url: str) -> dict:
+    if not url.startswith("postgresql"):
+        return {}
+
+    return {
+        "connect_timeout": settings.DB_CONNECT_TIMEOUT_SECONDS,
+        "keepalives": settings.DB_KEEPALIVES,
+        "keepalives_idle": settings.DB_KEEPALIVES_IDLE_SECONDS,
+        "keepalives_interval": settings.DB_KEEPALIVES_INTERVAL_SECONDS,
+        "keepalives_count": settings.DB_KEEPALIVES_COUNT,
+    }
+
+
+connect_args = _build_connect_args(resolved_database_url)
 
 engine = create_engine(
     resolved_database_url,
     pool_pre_ping=True,
+    pool_recycle=1800,
     pool_size=10,
     max_overflow=20,
     echo=False,

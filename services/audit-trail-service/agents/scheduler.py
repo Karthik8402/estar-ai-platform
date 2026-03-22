@@ -15,8 +15,9 @@ from collections import Counter
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_
+from sqlalchemy.exc import DBAPIError, InterfaceError, OperationalError
 
-from db.database import SessionLocal
+from db.database import SessionLocal, engine
 from config.settings import get_settings
 from db.models import (
     AgentConfig, AuditAnomaly, AuditThreshold, AuditReport,
@@ -29,6 +30,70 @@ logger = logging.getLogger("agents")
 logger.setLevel(logging.INFO)
 
 scheduler = AsyncIOScheduler()
+
+
+def _is_transient_db_disconnect(exc: Exception) -> bool:
+    if isinstance(exc, DBAPIError) and getattr(exc, "connection_invalidated", False):
+        return True
+
+    if isinstance(exc, (OperationalError, InterfaceError)):
+        return True
+
+    message = str(exc).lower()
+    disconnect_markers = (
+        "server closed the connection unexpectedly",
+        "terminating connection",
+        "connection reset by peer",
+        "connection not open",
+        "ssl connection has been closed unexpectedly",
+        "broken pipe",
+    )
+    return any(marker in message for marker in disconnect_markers)
+
+
+def _update_agent_error_state(agent_id: str, *, status: str, error_message: str, last_result: str) -> None:
+    status_db: Session = SessionLocal()
+    try:
+        agent = status_db.query(AgentConfig).filter(AgentConfig.agent_id == agent_id).first()
+        if agent:
+            agent.status = status
+            agent.error_message = error_message[:500]
+            agent.last_result = last_result
+            agent.last_run = datetime.now(timezone.utc)
+            status_db.commit()
+    except Exception:
+        status_db.rollback()
+    finally:
+        status_db.close()
+
+
+def _handle_agent_exception(agent_id: str, label: str, exc: Exception, db: Session) -> None:
+    logger.error(f"[{label}] Error: {exc}", exc_info=True)
+    try:
+        db.rollback()
+    except Exception:
+        pass
+
+    if _is_transient_db_disconnect(exc):
+        try:
+            engine.dispose()
+        except Exception:
+            pass
+        _update_agent_error_state(
+            agent_id,
+            status="running",
+            error_message=str(exc),
+            last_result="Transient database disconnect detected; retrying automatically.",
+        )
+        logger.warning(f"[{label}] Transient DB disconnect handled; engine pool disposed and agent kept running")
+        return
+
+    _update_agent_error_state(
+        agent_id,
+        status="error",
+        error_message=str(exc),
+        last_result="Agent moved to error state. Use Start to resume after fixing the issue.",
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -51,10 +116,15 @@ async def run_log_analyzer():
         off_hours_start = int(thresholds.get("off_hours_start", "22:00").split(":")[0])
         off_hours_end = int(thresholds.get("off_hours_end", "06:00").split(":")[0])
 
-        # Time window: only scan events since last agent run
-        since = agent.last_run or (datetime.now(timezone.utc) - timedelta(minutes=5))
+        # Time window: only scan recent data and cap lookback to avoid oversized recovery queries.
+        now = datetime.now(timezone.utc)
+        max_lookback = max(5, int(get_settings().AGENT_MAX_LOOKBACK_MINUTES))
+        since = agent.last_run or (now - timedelta(minutes=5))
         if since.tzinfo is None:
             since = since.replace(tzinfo=timezone.utc)
+        floor = now - timedelta(minutes=max_lookback)
+        if since < floor:
+            since = floor
 
         # Query recent audit events with their dimensions
         recent_events = (
@@ -214,17 +284,7 @@ async def run_log_analyzer():
 
         db.commit()
     except Exception as e:
-        logger.error(f"[AGENT 1] Error: {e}", exc_info=True)
-        try:
-            db.rollback()
-            agent = db.query(AgentConfig).filter(AgentConfig.agent_id == "agent_1").first()
-            if agent:
-                agent.status = "error"
-                agent.error_message = str(e)[:500]
-                agent.last_run = datetime.now(timezone.utc)
-                db.commit()
-        except Exception:
-            db.rollback()
+        _handle_agent_exception("agent_1", "AGENT 1", e, db)
     finally:
         db.close()
 
@@ -246,6 +306,10 @@ async def run_integrity_monitor():
         window_start = agent.last_run or (now - timedelta(minutes=15))
         if window_start.tzinfo is None:
             window_start = window_start.replace(tzinfo=timezone.utc)
+        max_lookback = max(5, int(get_settings().AGENT_MAX_LOOKBACK_MINUTES))
+        floor = now - timedelta(minutes=max_lookback)
+        if window_start < floor:
+            window_start = floor
         window_start_naive = window_start.replace(tzinfo=None)
 
         # ── Check 1: Sequential event numbering ──
@@ -445,17 +509,7 @@ async def run_integrity_monitor():
 
         db.commit()
     except Exception as e:
-        logger.error(f"[AGENT 2] Error: {e}", exc_info=True)
-        try:
-            db.rollback()
-            agent = db.query(AgentConfig).filter(AgentConfig.agent_id == "agent_2").first()
-            if agent:
-                agent.status = "error"
-                agent.error_message = str(e)[:500]
-                agent.last_run = datetime.now(timezone.utc)
-                db.commit()
-        except Exception:
-            db.rollback()
+        _handle_agent_exception("agent_2", "AGENT 2", e, db)
     finally:
         db.close()
 
@@ -580,17 +634,7 @@ async def run_compliance_reporter():
 
         db.commit()
     except Exception as e:
-        logger.error(f"[AGENT 3] Error: {e}", exc_info=True)
-        try:
-            db.rollback()
-            agent = db.query(AgentConfig).filter(AgentConfig.agent_id == "agent_3").first()
-            if agent:
-                agent.status = "error"
-                agent.error_message = str(e)[:500]
-                agent.last_run = datetime.now(timezone.utc)
-                db.commit()
-        except Exception:
-            db.rollback()
+        _handle_agent_exception("agent_3", "AGENT 3", e, db)
     finally:
         db.close()
 
