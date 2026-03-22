@@ -6,7 +6,9 @@ from functools import lru_cache
 
 class Settings(BaseSettings):
     # Database
-    DATABASE_URL: str = "postgresql://<db_user>:<db_password>@localhost:5432/<db_name>"
+    DATABASE_URL: str = "postgresql://epharmic:change-me-in-development@localhost:5432/epharmic_db"
+    DATABASE_URL_FALLBACK: str = ""
+    DB_CONNECT_TIMEOUT_SECONDS: int = 8
 
     # JWT (deferred — not enforced yet)
     JWT_SECRET: str = "change-me-in-development"

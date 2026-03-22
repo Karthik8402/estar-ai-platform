@@ -31,6 +31,16 @@ cp .env.example .env
 ```
 Ensure you add your `GEMINI_API_KEY` to the `.env` file. Do NOT commit the `.env` file to version control.
 
+Set `DATABASE_URL` to your primary PostgreSQL connection string.
+If your cloud DB hostname occasionally fails DNS resolution, set `DATABASE_URL_FALLBACK` to a local PostgreSQL URL so startup can still proceed in development.
+
+Example local values:
+```env
+DATABASE_URL=postgresql://epharmic:change-me-in-development@localhost:5432/epharmic_db
+DATABASE_URL_FALLBACK=
+DB_CONNECT_TIMEOUT_SECONDS=8
+```
+
 ### 3. Database Initialization
 
 Start your PostgreSQL instance. If you are using Docker, run:
@@ -55,6 +65,14 @@ Start the FastAPI server (which automatically launches the APScheduler backgroun
 python -m uvicorn api.main:app --port 8001 --reload
 ```
 The API contract and interactive Swagger UI will be available at `http://localhost:8001/docs`.
+
+### Troubleshooting: "could not translate host name"
+
+This indicates DNS/network resolution failed for your DB host at startup.
+
+- Verify your hostname and credentials in `.env` are correct.
+- On Windows, test DNS directly: `nslookup <your-db-host>`.
+- If cloud DNS is unstable, use a local Docker PostgreSQL instance and point `DATABASE_URL` (or `DATABASE_URL_FALLBACK`) to `localhost`.
 
 ## Core API Endpoints
 

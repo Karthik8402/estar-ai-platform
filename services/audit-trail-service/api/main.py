@@ -9,6 +9,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy.exc import SQLAlchemyError
 
 from config.settings import get_settings
 from db.database import engine
@@ -27,7 +28,15 @@ async def lifespan(app: FastAPI):
     settings = get_settings()
 
     # Auto-create tables (development convenience — use Alembic in production)
-    Base.metadata.create_all(bind=engine)
+    try:
+        Base.metadata.create_all(bind=engine)
+    except SQLAlchemyError as exc:
+        logger.error("Database startup failed. Check DATABASE_URL and database reachability.", exc_info=True)
+        raise RuntimeError(
+            "Database connection failed during startup. "
+            "Verify DATABASE_URL or configure DATABASE_URL_FALLBACK in .env."
+        ) from exc
+
     print(f"🚀 {settings.SERVICE_NAME} v{settings.SERVICE_VERSION} starting on port {settings.SERVICE_PORT}")
     print(f"📦 Database: {settings.DATABASE_URL.split('@')[-1] if '@' in settings.DATABASE_URL else 'configured'}")
     print(f"🤖 AI Provider: {settings.AI_PROVIDER}")
