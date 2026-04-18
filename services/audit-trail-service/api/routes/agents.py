@@ -3,7 +3,7 @@
 import logging
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from db.database import get_db
@@ -14,7 +14,7 @@ logger = logging.getLogger("audit-trail-service")
 
 
 class AgentAction(BaseModel):
-    agent_id: str
+    agent_id: str = Field(min_length=3, max_length=20, pattern=r"^agent_[A-Za-z0-9_-]+$")
 
 
 @router.get("/agents/status")
@@ -40,7 +40,7 @@ def get_agent_status(db: Session = Depends(get_db)):
 
     except Exception as e:
         logger.error(f"[/agents/status] Database query failed: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to fetch agent status: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch agent status.")
 
 
 @router.post("/agents/start")
@@ -67,7 +67,7 @@ def start_agent(body: AgentAction, db: Session = Depends(get_db)):
     except Exception as e:
         db.rollback()
         logger.error(f"[/agents/start] Failed to start agent {body.agent_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to start agent: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to start agent.")
 
 
 @router.post("/agents/stop")
@@ -92,7 +92,7 @@ def stop_agent(body: AgentAction, db: Session = Depends(get_db)):
     except Exception as e:
         db.rollback()
         logger.error(f"[/agents/stop] Failed to stop agent {body.agent_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to stop agent: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to stop agent.")
 
 
 @router.post("/agents/start-all")
@@ -110,7 +110,7 @@ def start_all_agents(db: Session = Depends(get_db)):
     except Exception as e:
         db.rollback()
         logger.error(f"[/agents/start-all] Failed: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to start all agents: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to start all agents.")
 
 
 @router.post("/agents/stop-all")
@@ -126,4 +126,4 @@ def stop_all_agents(db: Session = Depends(get_db)):
     except Exception as e:
         db.rollback()
         logger.error(f"[/agents/stop-all] Failed: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to stop all agents: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to stop all agents.")

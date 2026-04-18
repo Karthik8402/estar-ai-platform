@@ -2,7 +2,7 @@
 
 import logging
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
@@ -41,11 +41,14 @@ def get_reports(db: Session = Depends(get_db)):
 
     except Exception as e:
         logger.error(f"[/reports/summary] Database query failed: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to fetch reports: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch reports.")
 
 
 @router.post("/reports/generate")
-async def generate_report(db: Session = Depends(get_db), report_type: str = "on-demand"):
+async def generate_report(
+    db: Session = Depends(get_db),
+    report_type: str = Query(default="on-demand", min_length=1, max_length=20, pattern=r"^[a-z][a-z0-9-]*$"),
+):
     """Generate a new compliance report using Gemini AI.
 
     Collects current anomalies, integrity data, and agent status,
@@ -216,7 +219,7 @@ FORMATTING RULES:
                 total_anomalies, compliance_score, recent_anomalies, violations
             )
     except Exception as e:
-        print(f"❌ AI Report Generation Failed: {e}")
+        logger.warning("[/reports/generate] AI report generation failed; using fallback: %s", e)
         # Fallback: generate a template report without AI
         summary_text = _generate_fallback_report(
             total_anomalies, compliance_score, recent_anomalies, violations
@@ -251,7 +254,7 @@ FORMATTING RULES:
     except Exception as e:
         db.rollback()
         logger.error(f"[/reports/generate] Failed to save report: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to save generated report: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to save generated report.")
 
 
 def _generate_fallback_report(

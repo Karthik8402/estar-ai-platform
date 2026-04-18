@@ -1,23 +1,25 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useState } from 'react';
 import { format } from 'date-fns';
+import { useIsMutating } from '@tanstack/react-query';
 import { useReports, useGenerateReport } from '../../hooks/audit/useReports';
 import SectionLoader from '../shared/SectionLoader';
 import SectionError from '../shared/SectionError';
-import { useIsMutating } from '@tanstack/react-query';
 import PaginationBar from '../shared/PaginationBar';
+
+const PAGE_SIZE = 5;
 
 export default function ReportViewer() {
   const { data: reports = [], isLoading, isError, refetch } = useReports();
   const generateMutation = useGenerateReport();
-  const [selectedId, setSelectedId] = useState<string>(reports[0]?.report_id ?? '');
+
+  const [selectedId, setSelectedId] = useState<string>('');
   const [filterType, setFilterType] = useState<string>('all');
   const [generateType, setGenerateType] = useState<string>('on-demand');
   const [page, setPage] = useState(1);
-  const PAGE_SIZE = 5;
 
   const filteredReports = filterType === 'all'
     ? reports
-    : reports.filter(r => r.report_type === filterType);
+    : reports.filter((r) => r.report_type === filterType);
 
   const totalPages = Math.max(1, Math.ceil(filteredReports.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
@@ -26,57 +28,58 @@ export default function ReportViewer() {
   const pagedReports = filteredReports.slice(pageStart, pageEnd);
   const emptyRows = Math.max(0, PAGE_SIZE - pagedReports.length);
 
-  const selected = filteredReports.length > 0
-    ? (filteredReports.find(r => r.report_id === selectedId) ?? filteredReports[0])
-    : (filterType === 'all' ? reports[0] : undefined);
+  const resolvedSelectedId = filteredReports.find((r) => r.report_id === selectedId)?.report_id
+    ?? filteredReports[0]?.report_id
+    ?? (filterType === 'all' ? reports[0]?.report_id : undefined);
+
+  const selectedReport = resolvedSelectedId
+    ? (
+      filteredReports.find((r) => r.report_id === resolvedSelectedId)
+      ?? reports.find((r) => r.report_id === resolvedSelectedId)
+    )
+    : undefined;
+
+  const filterOptions = ['all', ...Array.from(new Set([
+    ...reports.map((r) => r.report_type),
+    'on-demand',
+    'daily',
+    'weekly',
+    'monthly',
+    'auto-triggered',
+  ])).filter(Boolean)];
+
+  const generateOptions = Array.from(new Set([
+    'on-demand',
+    'daily',
+    'weekly',
+    'monthly',
+    ...reports.map((r) => r.report_type),
+  ])).filter(Boolean);
+
   const globalMutationsCount = useIsMutating({ mutationKey: ['generateReport'] });
   const generating = generateMutation.isPending || globalMutationsCount > 0;
 
   const handleGenerate = () => {
     generateMutation.mutate(generateType, {
       onSuccess: (newReport) => {
-        if (newReport && newReport.report_id) {
-          setSelectedId(newReport.report_id);
-          if (filterType !== 'all' && newReport.report_type !== filterType) {
-            setFilterType('all');
-          }
+        setPage(1);
+        if (!newReport?.report_id) {
+          return;
         }
-      }
+
+        setSelectedId(newReport.report_id);
+
+        if (filterType !== 'all' && newReport.report_type !== filterType) {
+          setFilterType('all');
+        }
+      },
     });
   };
 
-  useEffect(() => {
-    if (!selectedId && reports.length > 0) {
-      setSelectedId(reports[0].report_id);
-      return;
-    }
-
-    if (filteredReports.length > 0 && !filteredReports.find(r => r.report_id === selectedId)) {
-      setSelectedId(filteredReports[0].report_id);
-    }
-  }, [filteredReports, reports, selectedId]);
-
-  useEffect(() => {
+  const handleFilterChange = (type: string) => {
+    setFilterType(type);
     setPage(1);
-  }, [filterType]);
-
-  useEffect(() => {
-    if (page > totalPages) {
-      setPage(totalPages);
-    }
-  }, [page, totalPages]);
-
-  const filterOptions = useMemo(() => {
-    const preferred = ['on-demand', 'daily', 'weekly', 'monthly', 'auto-triggered'];
-    const fromData = Array.from(new Set(reports.map(r => r.report_type)));
-    const merged = Array.from(new Set([...fromData, ...preferred])).filter(Boolean);
-    return ['all', ...merged];
-  }, [reports]);
-
-  const generateOptions = useMemo(() => {
-    const base = ['on-demand', 'daily', 'weekly', 'monthly'];
-    return Array.from(new Set([...base, ...reports.map(r => r.report_type)])).filter(Boolean);
-  }, [reports]);
+  };
 
   const formatReportType = (value: string) =>
     value.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
@@ -115,7 +118,7 @@ export default function ReportViewer() {
 
       const isHeading = trimmed === trimmed.toUpperCase()
         && trimmed.length > 3
-        && !trimmed.startsWith('•')
+        && !trimmed.startsWith('�')
         && !trimmed.startsWith('-');
 
       if (isHeading) {
@@ -125,7 +128,7 @@ export default function ReportViewer() {
         continue;
       }
 
-      const isBullet = trimmed.startsWith('•') || trimmed.startsWith('-');
+      const isBullet = trimmed.startsWith('�') || trimmed.startsWith('-');
       if (isBullet) {
         flushParagraph();
         currentBullets.push(trimmed.slice(1).trim());
@@ -152,7 +155,6 @@ export default function ReportViewer() {
 
   return (
     <div>
-      {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <h2 style={{ fontSize: '20px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>Reports</h2>
         <button
@@ -179,21 +181,21 @@ export default function ReportViewer() {
         >
           {generating && (
             <span style={{
-              width: '14px', height: '14px',
+              width: '14px',
+              height: '14px',
               borderWidth: '2px',
               borderStyle: 'solid',
-              borderColor: 'rgba(255,255,255,0.3)', // Base border color for the spinner
+              borderColor: 'rgba(255,255,255,0.3)',
               borderTopColor: 'var(--border-strong)',
               borderRadius: '50%',
               display: 'inline-block',
               animation: 'spin 0.8s linear infinite',
             }} />
           )}
-          {generating ? 'Generating…' : 'Generate Report'}
+          {generating ? 'Generating...' : 'Generate Report'}
         </button>
       </div>
 
-      {/* Generation error inline message */}
       {generateMutation.isError && (
         <div style={{
           background: 'rgba(239, 68, 68, 0.06)',
@@ -208,10 +210,8 @@ export default function ReportViewer() {
         </div>
       )}
 
-      {/* Loading state */}
-      {isLoading && <SectionLoader type="table" label="Loading reports…" />}
+      {isLoading && <SectionLoader type="table" label="Loading reports..." />}
 
-      {/* Error state */}
       {isError && !isLoading && (
         <SectionError
           message="Could not load report data."
@@ -219,7 +219,6 @@ export default function ReportViewer() {
         />
       )}
 
-      {/* Content — only when loaded */}
       {!isLoading && !isError && (
         <>
           <div
@@ -237,7 +236,7 @@ export default function ReportViewer() {
             {filterOptions.map((type) => (
               <button
                 key={type}
-                onClick={() => setFilterType(type)}
+                onClick={() => handleFilterChange(type)}
                 style={{
                   padding: '3px 10px',
                   borderRadius: '9999px',
@@ -282,7 +281,6 @@ export default function ReportViewer() {
             </div>
           </div>
 
-          {/* Reports table */}
           <div
             style={{
               background: 'var(--surface)',
@@ -366,7 +364,7 @@ export default function ReportViewer() {
                           padding: 0,
                         }}
                       >
-                        {selectedId === r.report_id ? 'Viewing' : 'View'}
+                        {resolvedSelectedId === r.report_id ? 'Viewing' : 'View'}
                       </button>
                     </td>
                   </tr>
@@ -387,14 +385,13 @@ export default function ReportViewer() {
               total={filteredReports.length}
               page={safePage}
               totalPages={totalPages}
-              onPrev={() => setPage((p) => Math.max(1, p - 1))}
-              onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
+              onPrev={() => setPage(Math.max(1, safePage - 1))}
+              onNext={() => setPage(Math.min(totalPages, safePage + 1))}
               className="report-pagination-spacing"
             />
           )}
 
-          {/* Report text viewer */}
-          {selected && (
+          {selectedReport && (
             <div
               className="report-viewer"
               style={{
@@ -405,9 +402,9 @@ export default function ReportViewer() {
               }}
             >
               <h2 style={{ fontSize: '20px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 8px 0' }}>
-                {formatReportType(selected.report_type)} Activity Summary — {format(new Date(selected.generated_at), 'MMM d, yyyy')}
+                {formatReportType(selectedReport.report_type)} Activity Summary - {format(new Date(selectedReport.generated_at), 'MMM d, yyyy')}
               </h2>
-              {reportLooksIncomplete(selected.summary_text) && (
+              {reportLooksIncomplete(selectedReport.summary_text) && (
                 <div style={{
                   background: 'rgba(245, 158, 11, 0.08)',
                   border: '1px solid rgba(245, 158, 11, 0.25)',
@@ -422,7 +419,7 @@ export default function ReportViewer() {
               )}
               <div style={{ borderBottom: '1px solid var(--border)', margin: '8px 0 16px 0' }} />
               <div className="report-viewer-content">
-                {parseReportText(selected.summary_text).map((block, index) => {
+                {parseReportText(selectedReport.summary_text).map((block, index) => {
                   if (block.type === 'heading') {
                     return (
                       <div key={index} className="report-section-title">

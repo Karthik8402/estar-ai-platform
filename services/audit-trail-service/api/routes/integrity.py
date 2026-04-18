@@ -65,4 +65,4 @@ def get_integrity(db: Session = Depends(get_db)):
 
     except Exception as e:
         logger.error(f"[/reports/integrity] Database query failed: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to fetch integrity data: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch integrity data.")

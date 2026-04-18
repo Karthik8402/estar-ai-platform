@@ -30,12 +30,6 @@ export default function IntegrityView() {
     return () => clearTimeout(timer);
   }, [integrity_score]);
 
-  useEffect(() => {
-    if (violationPage > violationTotalPages) {
-      setViolationPage(violationTotalPages);
-    }
-  }, [violationPage, violationTotalPages]);
-
   const barColor = integrity_score >= 90
     ? 'var(--status-online)'
     : integrity_score >= 70
@@ -200,8 +194,8 @@ export default function IntegrityView() {
             total={violations.length}
             page={safeViolationPage}
             totalPages={violationTotalPages}
-            onPrev={() => setViolationPage((p) => Math.max(1, p - 1))}
-            onNext={() => setViolationPage((p) => Math.min(violationTotalPages, p + 1))}
+            onPrev={() => setViolationPage(Math.max(1, safeViolationPage - 1))}
+            onNext={() => setViolationPage(Math.min(violationTotalPages, safeViolationPage + 1))}
             className="integrity-pagination-shell"
           />
         )}

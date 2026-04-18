@@ -10,16 +10,52 @@ Tables:
 """
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import (
     Boolean, Column, DateTime, DECIMAL, ForeignKey, Integer,
     String, Text, Float, JSON,
 )
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID, JSONB
 from sqlalchemy.orm import declarative_base, relationship
+from sqlalchemy.types import CHAR, TypeDecorator
 
 Base = declarative_base()
+JSON_VALUE = JSON().with_variant(JSONB, "postgresql")
+
+
+def utc_now() -> datetime:
+    """Return naive UTC timestamps to match the existing database columns."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+class GUID(TypeDecorator):
+    """Platform-independent UUID column.
+
+    PostgreSQL keeps native UUID storage; SQLite stores canonical text for tests.
+    """
+
+    impl = CHAR
+    cache_ok = True
+
+    def load_dialect_impl(self, dialect):
+        if dialect.name == "postgresql":
+            return dialect.type_descriptor(PG_UUID(as_uuid=True))
+        return dialect.type_descriptor(CHAR(36))
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return value
+        if dialect.name == "postgresql":
+            return value
+        return str(value)
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return value
+        if isinstance(value, uuid.UUID):
+            return value
+        return uuid.UUID(str(value))
 
 
 # ═══════════════════════════════════════════════════════════
@@ -31,7 +67,7 @@ class DimRole(Base):
 
     role_id = Column(Integer, primary_key=True, autoincrement=True)
     role_name = Column(String(50), nullable=False)
-    permissions_json = Column(JSONB, default={})
+    permissions_json = Column(JSON_VALUE, default=dict)
 
     users = relationship("DimUser", back_populates="role")
 
@@ -83,12 +119,12 @@ class DimAction(Base):
 class DimSession(Base):
     __tablename__ = "dim_session"
 
-    session_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    session_id = Column(GUID(), primary_key=True, default=uuid.uuid4)
     ip_address = Column(String(45))
     device_fingerprint = Column(String(255))
     geo_location = Column(String(100))
-    created_at = Column(DateTime, default=datetime.utcnow)
-    last_used_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
+    last_used_at = Column(DateTime, default=utc_now)
 
     audit_events = relationship("FactAuditEvent", back_populates="session")
 
@@ -116,15 +152,15 @@ class DimTime(Base):
 class FactAuditEvent(Base):
     __tablename__ = "fact_audit_events"
 
-    event_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    event_id = Column(GUID(), primary_key=True, default=uuid.uuid4)
     timestamp_id = Column(Integer, ForeignKey("dim_time.time_id"))
     user_id = Column(Integer, ForeignKey("dim_user.user_id"))
     action_id = Column(Integer, ForeignKey("dim_action.action_id"))
     module_id = Column(Integer, ForeignKey("dim_module.module_id"))
-    session_id = Column(UUID(as_uuid=True), ForeignKey("dim_session.session_id"))
+    session_id = Column(GUID(), ForeignKey("dim_session.session_id"))
     risk_score = Column(DECIMAL(5, 2), default=0)
     is_compliant = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
     # Relationships
     time_dim = relationship("DimTime", back_populates="audit_events")
@@ -144,7 +180,7 @@ class AuditAnomaly(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     event_id = Column(String(20), nullable=False, unique=True)
-    timestamp = Column(DateTime, default=datetime.utcnow)
+    timestamp = Column(DateTime, default=utc_now)
     anomaly_type = Column(String(30), nullable=False)  # human_error | integrity_fail | unauthorized
     severity = Column(String(10), nullable=False)       # info | warn | error | critical
     message = Column(Text, nullable=False)
@@ -153,7 +189,7 @@ class AuditAnomaly(Base):
     user = Column(String(100))
     session_id = Column(String(50))
     ip_address = Column(String(45))
-    raw_payload = Column(JSONB, default={})
+    raw_payload = Column(JSON_VALUE, default=dict)
 
 
 class IntegrityCheck(Base):
@@ -164,7 +200,7 @@ class IntegrityCheck(Base):
     check_name = Column(String(100), nullable=False)
     passed = Column(Boolean, default=True)
     detail = Column(String(200))
-    checked_at = Column(DateTime, default=datetime.utcnow)
+    checked_at = Column(DateTime, default=utc_now)
 
 
 class IntegrityViolation(Base):
@@ -177,7 +213,7 @@ class IntegrityViolation(Base):
     severity = Column(String(10), default="warn")
     user = Column(String(100))
     action = Column(String(100))
-    timestamp = Column(DateTime, default=datetime.utcnow)
+    timestamp = Column(DateTime, default=utc_now)
 
 
 class AuditReport(Base):
@@ -187,7 +223,7 @@ class AuditReport(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     report_id = Column(String(20), nullable=False, unique=True)
     report_type = Column(String(20), nullable=False)  # daily | weekly | monthly | on-demand
-    generated_at = Column(DateTime, default=datetime.utcnow)
+    generated_at = Column(DateTime, default=utc_now)
     compliance_score = Column(Integer, default=0)
     anomaly_count = Column(Integer, default=0)
     summary_text = Column(Text, default="")

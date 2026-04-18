@@ -39,6 +39,9 @@ Example local values:
 DATABASE_URL=postgresql://epharmic:change-me-in-development@localhost:5432/epharmic_db
 DATABASE_URL_FALLBACK=
 DB_CONNECT_TIMEOUT_SECONDS=8
+AUTO_CREATE_TABLES=true
+ENABLE_SCHEDULER=true
+CORS_ALLOW_ALL=false
 ```
 
 ### 3. Database Initialization
@@ -65,6 +68,11 @@ Start the FastAPI server (which automatically launches the APScheduler backgroun
 python -m uvicorn api.main:app --port 8001 --reload
 ```
 The API contract and interactive Swagger UI will be available at `http://localhost:8001/docs`.
+
+For API smoke tests that do not need a live database, run:
+```bash
+python -m unittest discover -s tests
+```
 
 ### Troubleshooting: "could not translate host name"
 

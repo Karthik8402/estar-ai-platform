@@ -39,4 +39,4 @@ def get_recent_activity(
 
     except Exception as e:
         logger.error(f"[/activity/recent] Database query failed: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to fetch recent activity: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch recent activity.")

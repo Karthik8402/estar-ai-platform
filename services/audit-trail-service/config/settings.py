@@ -1,7 +1,8 @@
 """Application configuration via environment variables."""
 
-from pydantic_settings import BaseSettings
 from functools import lru_cache
+
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
@@ -14,10 +15,14 @@ class Settings(BaseSettings):
     DB_KEEPALIVES_INTERVAL_SECONDS: int = 10
     DB_KEEPALIVES_COUNT: int = 5
 
+    # Startup/runtime controls
+    AUTO_CREATE_TABLES: bool = True
+    ENABLE_SCHEDULER: bool = True
+
     # Agent safety bounds
     AGENT_MAX_LOOKBACK_MINUTES: int = 30
 
-    # JWT (deferred — not enforced yet)
+    # JWT (deferred; not enforced yet)
     JWT_SECRET: str = "change-me-in-development"
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRY_MINUTES: int = 15
@@ -35,8 +40,8 @@ class Settings(BaseSettings):
     SIMULATION_INTERVAL_SECONDS: int = 240
     SIMULATION_EVENT_BATCH: int = 8
 
-    # CORS — set CORS_ALLOW_ALL=true in production to allow all origins
-    CORS_ALLOW_ALL: bool = True
+    # CORS
+    CORS_ALLOW_ALL: bool = False
     ALLOWED_ORIGINS: list[str] = [
         "http://localhost:3000",
         "http://localhost:5173",

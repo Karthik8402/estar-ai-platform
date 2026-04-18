@@ -59,7 +59,8 @@ def health_check(db: Session = Depends(get_db)):
         ai_ready = True
         ai_status = "ready"
     except Exception as e:
-        ai_status = str(e)
+        logger.info("[/health] AI provider not ready: %s", e)
+        ai_status = "unavailable"
 
     return {
         "status": status,

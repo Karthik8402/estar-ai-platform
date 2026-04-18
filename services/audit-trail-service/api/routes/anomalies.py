@@ -17,9 +17,9 @@ logger = logging.getLogger("audit-trail-service")
 def get_anomalies(
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=10, ge=1, le=100),
-    severity: str = Query(default=None),
-    type: str = Query(default=None),
-    search: str = Query(default=None),
+    severity: str | None = Query(default=None, max_length=20),
+    type: str | None = Query(default=None, max_length=50),
+    search: str | None = Query(default=None, max_length=120),
     db: Session = Depends(get_db),
 ):
     """Paginated anomaly list with filters for the AnomalyTable dashboard section."""
@@ -85,4 +85,4 @@ def get_anomalies(
 
     except Exception as e:
         logger.error(f"[/reports/anomalies] Database query failed: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to fetch anomalies: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch anomalies.")

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import type { AuditThresholds } from '../../config/simulatedAuditData';
 import { useThresholds, useComplianceRules, useUpdateThresholds } from '../../hooks/audit/useAuditConfig';
 import SectionLoader from '../shared/SectionLoader';
@@ -23,24 +23,47 @@ export default function AuditSettings() {
   const { data: fetchedThresholds, isLoading: thresholdsLoading, isError: thresholdsError, refetch: refetchThresholds } = useThresholds();
   const { data: rules = [], isLoading: rulesLoading, isError: rulesError } = useComplianceRules();
   const updateThresholdsMutation = useUpdateThresholds();
-  const [thresholds, setThresholds] = useState<AuditThresholds>({} as AuditThresholds);
+  const [draftThresholds, setDraftThresholds] = useState<AuditThresholds | null>(null);
   const [editMode, setEditMode] = useState(false);
   const saving = updateThresholdsMutation.isPending;
 
   const isLoading = thresholdsLoading || rulesLoading;
+  const thresholds = draftThresholds ?? fetchedThresholds ?? ({} as AuditThresholds);
 
-  useEffect(() => {
-    if (fetchedThresholds) setThresholds(fetchedThresholds);
-  }, [fetchedThresholds]);
+  const beginEdit = () => {
+    setDraftThresholds(fetchedThresholds ?? ({} as AuditThresholds));
+    setEditMode(true);
+  };
+
+  const cancelEdit = () => {
+    setEditMode(false);
+    setDraftThresholds(null);
+  };
 
   const handleSave = () => {
     updateThresholdsMutation.mutate(thresholds, {
-      onSuccess: () => setEditMode(false),
+      onSuccess: () => {
+        setEditMode(false);
+        setDraftThresholds(null);
+      },
     });
   };
 
+  const parseThresholdValue = (key: keyof AuditThresholds, value: string) => {
+    if (key === 'self_approval_enabled') {
+      const normalized = value.trim().toLowerCase();
+      if (normalized === 'true') return true;
+      if (normalized === 'false') return false;
+    }
+    const numeric = Number(value);
+    return Number.isNaN(numeric) ? value : numeric;
+  };
+
   const handleChange = (key: keyof AuditThresholds, value: string) => {
-    setThresholds(prev => ({ ...prev, [key]: isNaN(Number(value)) ? value : Number(value) }));
+    setDraftThresholds(prev => ({
+      ...(prev ?? thresholds),
+      [key]: parseThresholdValue(key, value),
+    }));
   };
 
   if (isLoading) {
@@ -72,10 +95,7 @@ export default function AuditSettings() {
         {editMode ? (
           <div style={{ display: 'flex', gap: '8px' }}>
             <button
-              onClick={() => {
-                setEditMode(false);
-                if (fetchedThresholds) setThresholds(fetchedThresholds);
-              }}
+              onClick={cancelEdit}
               disabled={saving}
               style={{
                 background: 'transparent',
@@ -126,7 +146,7 @@ export default function AuditSettings() {
           </div>
         ) : (
           <button
-            onClick={() => setEditMode(true)}
+            onClick={beginEdit}
             style={{
               background: 'var(--brand)',
               color: 'var(--text-inverse)',

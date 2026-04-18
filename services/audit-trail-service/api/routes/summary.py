@@ -78,4 +78,4 @@ def get_summary(db: Session = Depends(get_db)):
 
     except Exception as e:
         logger.error(f"[/summary] Database query failed: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to fetch summary: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch summary.")

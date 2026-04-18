@@ -1,5 +1,5 @@
 /**
- * SectionLoader — Reusable loading skeleton for audit dashboard sections.
+ * SectionLoader - Reusable loading skeleton for audit dashboard sections.
  * Shows a pulsing skeleton placeholder while data is being fetched.
  */
 
@@ -20,7 +20,9 @@ const SHIMMER_STYLE = {
   animation: 'glass-pulse 1.8s ease-in-out infinite',
 };
 
-export default function SectionLoader({ lines = 4, label = 'Loading…', type = 'lines' }: Props) {
+const LINE_WIDTHS = ['72%', '84%', '96%', '78%', '90%', '75%', '88%'];
+
+export default function SectionLoader({ lines = 4, label = 'Loading...', type = 'lines' }: Props) {
   const Header = (
     <div style={{
       fontSize: '13px',
@@ -50,7 +52,7 @@ export default function SectionLoader({ lines = 4, label = 'Loading…', type = 
       <div>
         {/* Metric Cards Skeleton */}
         <div className="grid grid-cols-2 md:grid-cols-4" style={{ gap: '16px', marginBottom: '24px' }}>
-          {[1, 2, 3, 4].map(k => (
+          {[1, 2, 3, 4].map((k) => (
             <div key={k} style={{ ...SHIMMER_STYLE, height: '100px', borderRadius: '12px' }} />
           ))}
         </div>
@@ -66,7 +68,7 @@ export default function SectionLoader({ lines = 4, label = 'Loading…', type = 
         {/* Header row skeleton */}
         <div style={{ ...SHIMMER_STYLE, height: '40px', borderRadius: '12px 12px 0 0', marginBottom: '1px' }} />
         {/* Data rows */}
-        {[1, 2, 3, 4, 5].map(k => (
+        {[1, 2, 3, 4, 5].map((k) => (
           <div key={k} style={{ ...SHIMMER_STYLE, height: '60px', borderRadius: '0', marginBottom: '1px' }} />
         ))}
         {/* Footer */}
@@ -76,7 +78,7 @@ export default function SectionLoader({ lines = 4, label = 'Loading…', type = 
   } else if (type === 'cards') {
     Content = (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        {[1, 2, 3].map(k => (
+        {[1, 2, 3].map((k) => (
           <div key={k} style={{ ...SHIMMER_STYLE, height: '140px', borderRadius: '12px' }} />
         ))}
       </div>
@@ -92,7 +94,7 @@ export default function SectionLoader({ lines = 4, label = 'Loading…', type = 
               height: '14px',
               borderRadius: '6px',
               marginBottom: '12px',
-              width: `${70 + Math.random() * 30}%`,
+              width: LINE_WIDTHS[i % LINE_WIDTHS.length],
             }}
           />
         ))}
