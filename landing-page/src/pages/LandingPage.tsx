@@ -23,25 +23,29 @@ export default function LandingPage({ services, version }: Props) {
       <div style={{ margin: '48px 0', textAlign: 'center', position: 'relative' }}>
         <div 
           style={{ 
-            width: '140px', height: '140px', borderRadius: '50%', 
-            background: 'radial-gradient(circle at 30% 30%, #93c5fd, #3b82f6, #1e3a8a)',
-            boxShadow: '0 12px 28px rgba(37, 99, 235, 0.4), inset 0 8px 16px rgba(255,255,255,0.5), inset 0 -8px 16px rgba(0,0,0,0.2)',
+            width: '140px', height: '140px', 
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             margin: '0 auto', position: 'relative',
-            border: '2px solid rgba(255,255,255,0.4)',
-            backdropFilter: 'blur(4px)'
+            filter: 'drop-shadow(0 12px 28px rgba(37, 99, 235, 0.3)) drop-shadow(0 4px 12px rgba(0,0,0,0.1))',
+            transition: 'transform 300ms ease, filter 300ms ease',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'scale(1.05)';
+            e.currentTarget.style.filter = 'drop-shadow(0 16px 36px rgba(37, 99, 235, 0.4)) drop-shadow(0 6px 16px rgba(0,0,0,0.15))';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'scale(1)';
+            e.currentTarget.style.filter = 'drop-shadow(0 12px 28px rgba(37, 99, 235, 0.3)) drop-shadow(0 4px 12px rgba(0,0,0,0.1))';
           }}
         >
-          <span 
-            className="font-sans"
+          <img 
+            src="/estar.png" 
+            alt="eSTAR AI Platform Logo" 
             style={{ 
-              color: 'white', fontWeight: 800, fontSize: '32px', 
-              letterSpacing: '-0.02em', textShadow: '0 2px 6px rgba(0,0,0,0.4)' 
-            }}
-          >
-            eSTAR
-          </span>
-          <div style={{ position: 'absolute', top: '10%', left: '15%', width: '40%', height: '30%', background: 'linear-gradient(135deg, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0) 100%)', borderRadius: '50%', transform: 'rotate(-20deg)' }}></div>
+              width: '100%', height: '100%', 
+              objectFit: 'cover',
+            }} 
+          />
         </div>
         <h1 style={{ marginTop: '20px', fontSize: '18px', fontWeight: 600, color: 'var(--text-primary)', textShadow: '0 1px 2px rgba(255,255,255,0.5)' }}>
           Electronic Stability Testing, Analyses & Reporting

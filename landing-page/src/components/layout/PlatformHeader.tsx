@@ -45,7 +45,16 @@ export default function PlatformHeader({ companyName, platformName }: Props) {
         }}
       >
       {/* Logo */}
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <img 
+          src="/estar.png" 
+          alt="eSTAR Logo" 
+          style={{ 
+            width: '28px', height: '28px', 
+            objectFit: 'contain',
+            filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.15))',
+          }} 
+        />
         <span style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)' }}>
           {platformName || 'eSTAR'}
         </span>
