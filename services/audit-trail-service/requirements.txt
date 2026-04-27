@@ -10,7 +10,7 @@ psycopg2-binary>=2.9
 # Validation & Config
 pydantic>=2.0
 pydantic-settings>=2.0
-python-dotenv>=1.0
+python-dotenv>=1.2.2
 
 # Background Tasks
 apscheduler>=3.10.4
