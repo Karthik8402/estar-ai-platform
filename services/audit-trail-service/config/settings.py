@@ -46,10 +46,8 @@ class Settings(BaseSettings):
         "http://localhost:3000",
         "http://localhost:5173",
         "http://127.0.0.1:5173",
-        "https://landing-page.ambitiousforest-7d7bdb17.southeastasia.azurecontainerapps.io",
-        "https://audit-trail-service.ambitiousforest-7d7bdb17.southeastasia.azurecontainerapps.io",
+        "https://landing-page-seven-sandy-97.vercel.app",
         "https://estar.karthikdev.app",
-        "https://api.estar.karthikdev.app",
     ]
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
