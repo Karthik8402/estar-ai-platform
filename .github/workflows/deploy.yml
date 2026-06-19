@@ -75,11 +75,11 @@ jobs:
       - name: Build frontend
         run: npm run build
 
-  # ─── Job 3: Deploy to Vercel & Render (only on main branch) ───
-  deploy:
-    name: ☁️ Deploy to Vercel & Render
+  # ─── Job 3: Deploy to Vercel (only on main branch) ───
+  vercel-deploy:
+    name: 📐 Deploy to Vercel
     runs-on: ubuntu-latest
-    needs: [backend-checks, frontend-checks]
+    needs: [frontend-checks]
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     environment: production
 
@@ -116,13 +116,41 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
+      - name: ✅ Vercel deployment complete
+        run: echo "🌐 Frontend deployed to Vercel!"
+
+  # ─── Job 4: Deploy to Render with Health Check (only on main branch) ───
+  render-deploy:
+    name: ⚡ Deploy to Render
+    runs-on: ubuntu-latest
+    needs: [backend-checks]
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    environment: production
+
+    steps:
       - name: Trigger Render Deploy
         run: |
           curl -f -s -X GET "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
 
-      - name: ✅ Deployment complete
+      - name: 🔍 Poll Render Backend Health Check
         run: |
-          echo "✅ Deployment triggered successfully!"
-          echo "🌐 Frontend: Check Vercel Dashboard"
-          echo "🔌 Backend: Check Render Dashboard"
+          echo "Polling Render backend health check..."
+          max_attempts=30
+          attempt=1
+          until [ $attempt -gt $max_attempts ]
+          do
+            response=$(curl -s -w "\n%{http_code}" https://audit-trail-service.onrender.com/health || echo -e "\n500")
+            http_code=$(echo "$response" | tail -n1)
+            body=$(echo "$response" | head -n -1)
+            echo "Attempt $attempt: HTTP Status $http_code"
+            if [ "$http_code" -eq 200 ] && echo "$body" | grep -q '"status":"healthy"'; then
+              echo "Backend is healthy! Deploy successful."
+              exit 0
+            fi
+            echo "Waiting 15 seconds before next attempt..."
+            sleep 15
+            attempt=$((attempt+1))
+          done
+          echo "❌ Backend health check failed or timed out!"
+          exit 1
 
