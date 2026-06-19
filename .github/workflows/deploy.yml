@@ -75,133 +75,54 @@ jobs:
       - name: Build frontend
         run: npm run build
 
-  # ─── Job 1: Build & Push Backend ──────────────────────────
-  build-backend:
-    needs: backend-checks
-    name: 🔧 Build Audit Trail Service
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-
-    outputs:
-      image-tag: ${{ steps.meta.outputs.version }}
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v4
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract metadata for backend image
-        id: meta
-        uses: docker/metadata-action@v6
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.GITHUB_USERNAME }}/audit-trail-service
-          tags: |
-            type=sha,prefix=sha-
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
-
-      - name: Build and push backend image
-        uses: docker/build-push-action@v7
-        with:
-          context: ./services/audit-trail-service
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-  # ─── Job 2: Build & Push Frontend ─────────────────────────
-  build-frontend:
-    needs: frontend-checks
-    name: 🎨 Build Landing Page
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-
-    outputs:
-      image-tag: ${{ steps.meta.outputs.version }}
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v4
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract metadata for frontend image
-        id: meta
-        uses: docker/metadata-action@v6
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.GITHUB_USERNAME }}/landing-page
-          tags: |
-            type=sha,prefix=sha-
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
-
-      - name: Build and push frontend image
-        uses: docker/build-push-action@v7
-        with:
-          context: ./landing-page
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          # Inject the Azure API URL at build time so Vite bakes it into the JS bundle
-          build-args: |
-            VITE_API_GATEWAY_URL=https://audit-trail-service.ambitiousforest-7d7bdb17.southeastasia.azurecontainerapps.io
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-  # ─── Job 3: Deploy to Azure (only on main branch) ─────────
+  # ─── Job 3: Deploy to Vercel & Render (only on main branch) ───
   deploy:
-    name: ☁️ Deploy to Azure Container Apps
+    name: ☁️ Deploy to Vercel & Render
     runs-on: ubuntu-latest
-    needs: [build-backend, build-frontend]
+    needs: [backend-checks, frontend-checks]
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     environment: production
 
     steps:
-      - name: Get short SHA
-        id: sha
-        run: echo "short=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
+      - name: Checkout code
+        uses: actions/checkout@v6
 
-      - name: Log in to Azure
-        uses: azure/login@v3
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
         with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          node-version: "20"
 
-      - name: Deploy audit-trail-service
-        run: |
-          az containerapp update \
-            --name audit-trail-service \
-            --resource-group ${{ env.RESOURCE_GROUP }} \
-            --image ${{ env.REGISTRY }}/${{ env.GITHUB_USERNAME }}/audit-trail-service:sha-${{ steps.sha.outputs.short }}
+      - name: Install Vercel CLI
+        run: npm install -g vercel@latest
 
-      - name: Deploy landing-page
+      - name: Pull Vercel Project Information
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+        working-directory: ./landing-page
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+      - name: Build Project Artifacts
+        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+        working-directory: ./landing-page
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+      - name: Deploy Project Artifacts to Vercel
+        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+        working-directory: ./landing-page
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+      - name: Trigger Render Deploy
         run: |
-          az containerapp update \
-            --name landing-page \
-            --resource-group ${{ env.RESOURCE_GROUP }} \
-            --image ${{ env.REGISTRY }}/${{ env.GITHUB_USERNAME }}/landing-page:sha-${{ steps.sha.outputs.short }}
+          curl -f -s -X GET "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
 
       - name: ✅ Deployment complete
         run: |
-          echo "✅ Both services deployed successfully!"
-          echo "🌐 Landing Page: https://landing-page.ambitiousforest-7d7bdb17.southeastasia.azurecontainerapps.io"
-          echo "🔌 API: https://audit-trail-service.ambitiousforest-7d7bdb17.southeastasia.azurecontainerapps.io"
+          echo "✅ Deployment triggered successfully!"
+          echo "🌐 Frontend: Check Vercel Dashboard"
+          echo "🔌 Backend: Check Render Dashboard"
+
