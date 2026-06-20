@@ -16,7 +16,7 @@ python-dotenv>=1.0
 apscheduler>=3.10.4
 
 # Security (JWT deferred, keeping for future)
-python-jose[cryptography]>=3.3
+python-jose[cryptography]>=3.5.0
 passlib[bcrypt]>=1.7
 
 # AI Provider
